@@ -170,6 +170,7 @@ check_dependencies() {
 install_fonts() {
     local os=$(detect_os)
     local fonts_dir
+    local install_iosevka="${INSTALL_IOSEVKA:-false}"
     
     case "$os" in
         "macos")
@@ -182,9 +183,35 @@ install_fonts() {
     
     mkdir -p "$fonts_dir"
     
-    # Install Iosevka font
-    if ! fc-list | grep -i "iosevka" > /dev/null 2>&1; then
-        print_info "Installing Iosevka font..."
+    # Install FiraMono Nerd Font (default terminal font)
+    if ! fc-list | grep -i "firamono nerd font" > /dev/null 2>&1; then
+        print_info "Installing FiraMono Nerd Font (default)..."
+        
+        local temp_dir=$(mktemp -d)
+        local fira_url="https://github.com/ryanoasis/nerd-fonts/releases/download/v3.1.1/FiraMono.zip"
+        
+        if command -v wget >/dev/null 2>&1; then
+            wget -O "$temp_dir/fira-nerd.zip" "$fira_url"
+        else
+            curl -L -o "$temp_dir/fira-nerd.zip" "$fira_url"
+        fi
+        
+        unzip -q "$temp_dir/fira-nerd.zip" -d "$temp_dir"
+        cp "$temp_dir"/*.ttf "$fonts_dir/" 2>/dev/null || true
+        
+        if [[ "$os" != "macos" ]]; then
+            fc-cache -fv
+        fi
+        print_info "✓ FiraMono Nerd Font installed"
+        
+        rm -rf "$temp_dir"
+    else
+        print_debug "✓ FiraMono Nerd Font already installed"
+    fi
+    
+    # Install Iosevka font (optional)
+    if [[ "$install_iosevka" == "true" ]] && ! fc-list | grep -i "iosevka" > /dev/null 2>&1; then
+        print_info "Installing Iosevka font (optional)..."
         
         local temp_dir=$(mktemp -d)
         local iosevka_url="https://github.com/be5invis/Iosevka/releases/download/v31.8.0/PkgTTC-Iosevka-31.8.0.zip"
@@ -204,13 +231,13 @@ install_fonts() {
         print_info "✓ Iosevka font installed"
         
         rm -rf "$temp_dir"
-    else
+    elif [[ "$install_iosevka" == "true" ]]; then
         print_debug "✓ Iosevka font already installed"
     fi
     
     # Install JetBrains Mono Nerd Font for waybar icons (Linux only)
     if [[ "$os" != "macos" ]] && ! fc-list | grep -i "jetbrainsmono nerd font" > /dev/null 2>&1; then
-        print_info "Installing JetBrains Mono Nerd Font..."
+        print_info "Installing JetBrains Mono Nerd Font (for waybar icons)..."
         
         local temp_dir=$(mktemp -d)
         local nerd_font_url="https://github.com/ryanoasis/nerd-fonts/releases/download/v3.1.1/JetBrainsMono.zip"
@@ -228,7 +255,7 @@ install_fonts() {
         
         rm -rf "$temp_dir"
     elif [[ "$os" == "macos" ]]; then
-        print_debug "✓ Skipping JetBrains Mono Nerd Font on macOS (not needed)"
+        print_debug "✓ Skipping JetBrains Mono Nerd Font on macOS (not needed for waybar)"
     else
         print_debug "✓ JetBrains Mono Nerd Font already installed"
     fi
@@ -433,14 +460,23 @@ show_usage() {
     echo "  install     Install dotfiles (default)"
     echo "  update      Update git-based packages"
     echo ""
+    echo "Environment variables:"
+    echo "  INSTALL_IOSEVKA=true    Install Iosevka font (optional)"
+    echo ""
     echo "Supported platforms:"
     echo "  - macOS (emacs, kitty, shell)"
     echo "  - Arch Linux (emacs, kitty, shell, hyprland, waybar)"
     echo "  - Other Linux distros (basic support)"
     echo ""
+    echo "Fonts installed:"
+    echo "  - FiraMono Nerd Font (default terminal font)"
+    echo "  - JetBrains Mono Nerd Font (waybar icons, Linux only)"
+    echo "  - Iosevka (optional, set INSTALL_IOSEVKA=true)"
+    echo ""
     echo "Examples:"
-    echo "  $0          # Install dotfiles for current platform"
-    echo "  $0 update   # Update git packages"
+    echo "  $0                      # Install dotfiles with FiraMono"
+    echo "  INSTALL_IOSEVKA=true $0 # Install dotfiles with Iosevka too"
+    echo "  $0 update               # Update git packages"
 }
 
 # Handle help and unknown commands

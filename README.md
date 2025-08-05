@@ -44,6 +44,9 @@ cd dotfiles
 # Install for your platform (auto-detected)
 ./install.sh
 
+# Install with optional Iosevka font
+INSTALL_IOSEVKA=true ./install.sh
+
 # Update git-based packages
 ./install.sh update
 
@@ -66,8 +69,9 @@ cd dotfiles
 ### 🔄 Cross-Platform Font Management
 - **macOS**: `~/Library/Fonts`
 - **Linux**: `~/.local/share/fonts` with font cache refresh
-- Automatic Iosevka font installation
-- Linux-only JetBrains Mono Nerd Font for Waybar
+- **Default**: FiraMono Nerd Font (clean monospace with icons)
+- **Optional**: Iosevka font (`INSTALL_IOSEVKA=true`)
+- **Linux-only**: JetBrains Mono Nerd Font for Waybar icons
 
 ### ⚙️ Intelligent Configuration Linking
 - Backs up existing configurations
