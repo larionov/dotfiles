@@ -174,22 +174,39 @@ install_emacs() {
         "local.el"
     )
     
-    # Emacs directories to link
-    declare -a EMACS_DIRS=(
-        "packages"
-    )
-    
+    # Link individual emacs config files
     for file in "${EMACS_FILES[@]}"; do
         if [[ -f "$DOTFILES_DIR/emacs/$file" ]]; then
             create_symlink "$DOTFILES_DIR/emacs/$file" "$emacs_dir/$file"
         fi
     done
     
-    for dir in "${EMACS_DIRS[@]}"; do
-        if [[ -d "$DOTFILES_DIR/emacs/$dir" ]]; then
-            create_symlink "$DOTFILES_DIR/emacs/$dir" "$emacs_dir/$dir"
-        fi
-    done
+    # Create packages directory and handle packages individually
+    mkdir -p "$emacs_dir/packages"
+    
+    # Install static packages from dotfiles (like dired+)
+    if [[ -d "$DOTFILES_DIR/emacs/packages" ]]; then
+        for package in "$DOTFILES_DIR/emacs/packages"/*; do
+            if [[ -d "$package" ]]; then
+                local package_name=$(basename "$package")
+                # Skip packages that should be cloned from git
+                if [[ "$package_name" != "macrursors" ]]; then
+                    create_symlink "$package" "$emacs_dir/packages/$package_name"
+                fi
+            fi
+        done
+    fi
+    
+    # Clone macrursors package from git (for updates)
+    local macrursors_dir="$emacs_dir/packages/macrursors"
+    if [[ ! -d "$macrursors_dir/.git" ]]; then
+        print_info "Installing macrursors package from git..."
+        rm -rf "$macrursors_dir"  # Remove any existing copy
+        git clone https://github.com/corytertel/macrursors "$macrursors_dir"
+        print_info "✓ macrursors package installed from git"
+    else
+        print_info "✓ macrursors package already installed from git"
+    fi
 }
 
 main() {
