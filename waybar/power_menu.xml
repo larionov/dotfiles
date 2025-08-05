@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <menu id="power_menu">
+    <section>
+      <item>
+        <attribute name="label">Shutdown</attribute>
+        <attribute name="action">power.shutdown</attribute>
+      </item>
+      <item>
+        <attribute name="label">Reboot</attribute>
+        <attribute name="action">power.reboot</attribute>
+      </item>
+      <item>
+        <attribute name="label">Suspend</attribute>
+        <attribute name="action">power.suspend</attribute>
+      </item>
+      <item>
+        <attribute name="label">Hibernate</attribute>
+        <attribute name="action">power.hibernate</attribute>
+      </item>
+    </section>
+  </menu>
+</interface>

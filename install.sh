@@ -118,6 +118,29 @@ install_fonts() {
     else
         print_info "✓ Iosevka font already installed"
     fi
+    
+    # Install JetBrains Mono Nerd Font for waybar icons
+    if ! fc-list | grep -i "jetbrainsmono nerd font" > /dev/null; then
+        print_info "Installing JetBrains Mono Nerd Font..."
+        
+        local temp_dir=$(mktemp -d)
+        local nerd_font_url="https://github.com/ryanoasis/nerd-fonts/releases/download/v3.1.1/JetBrainsMono.zip"
+        
+        if command -v wget >/dev/null 2>&1; then
+            wget -O "$temp_dir/jetbrains-nerd.zip" "$nerd_font_url"
+        else
+            curl -L -o "$temp_dir/jetbrains-nerd.zip" "$nerd_font_url"
+        fi
+        
+        unzip -q "$temp_dir/jetbrains-nerd.zip" -d "$temp_dir"
+        cp "$temp_dir"/*.ttf "$fonts_dir/" 2>/dev/null || true
+        fc-cache -fv
+        print_info "✓ JetBrains Mono Nerd Font installed"
+        
+        rm -rf "$temp_dir"
+    else
+        print_info "✓ JetBrains Mono Nerd Font already installed"
+    fi
 }
 
 install_emacs() {
