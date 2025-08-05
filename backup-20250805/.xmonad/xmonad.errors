@@ -1,0 +1,22 @@
+
+xmonad.hs:652:27: warning: [-Wdeprecations]
+    In the use of ‘spacing’ (imported from XMonad.Layout.Spacing):
+    Deprecated: "Use spacingRaw instead."
+    |
+652 |     mySpacing           = spacing gap
+    |                           ^^^^^^^
+
+xmonad.hs:1190:31: warning: [-Wdeprecations]
+    In the use of ‘tryMessage_’
+    (imported from XMonad.Actions.MessageFeedback):
+    Deprecated: "Use tryMessageWithNoRefreshToCurrent instead."
+     |
+1190 |     tryMsgR x y = sequence_ [(tryMessage_ x y), refresh]
+     |                               ^^^^^^^^^^^
+
+xmonad.hs:1460:1: warning: [-Wtabs]
+    Tab character found here, and in 18 further locations.
+    Please use spaces instead.
+     |
+1460 |                 where
+     | ^^^^^^^^

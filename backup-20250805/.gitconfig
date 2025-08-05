@@ -1,0 +1,29 @@
+[user]
+	email = sergey.larionov@gmail.com
+	name = Sergey Larionov
+[push]
+	default = simple
+[filter "lfs"]
+	clean = git-lfs clean -- %f
+	smudge = git-lfs smudge -- %f
+	process = git-lfs filter-process
+	required = true
+[diff]
+    tool = kitty
+    guitool = kitty.gui
+[difftool]
+    prompt = false
+    trustExitCode = true
+[difftool "kitty"]
+    cmd = kitty +kitten diff $LOCAL $REMOTE
+[difftool "kitty.gui"]
+	cmd = kitty kitty +kitten diff $LOCAL $REMOTE
+	
+[sequence]
+[core]
+	excludesfile = /home/larionov/.gitignore_global
+	editor = emacs -nw
+[merge]
+	conflictStyle = diff3
+[alias]
+	adog = log --all --decorate --oneline --graph
