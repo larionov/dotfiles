@@ -21,6 +21,14 @@ ask_confirmation() {
     [[ $REPLY =~ ^[Yy]$ ]]
 }
 
+# Define git-based packages globally (name:repo_url)
+declare -A GIT_PACKAGES=(
+    ["macrursors"]="https://github.com/corytertel/macrursors"
+    # Add more git packages here as needed:
+    # ["some-package"]="https://github.com/user/repo"
+    # ["another-package"]="https://github.com/user/another-repo"
+)
+
 backup_if_exists() {
     local target="$1"
     if [[ -e "$target" && ! -L "$target" ]]; then
@@ -181,36 +189,68 @@ install_emacs() {
         fi
     done
     
-    # Create packages directory and handle packages individually
+    # Create packages directory
     mkdir -p "$emacs_dir/packages"
     
-    # Install static packages from dotfiles (like dired+)
+    # Git packages are defined globally at the top of the script
+    
+    # Install git-based packages
+    for package_name in "${!GIT_PACKAGES[@]}"; do
+        local package_dir="$emacs_dir/packages/$package_name"
+        local repo_url="${GIT_PACKAGES[$package_name]}"
+        
+        if [[ ! -d "$package_dir/.git" ]]; then
+            print_info "Installing $package_name package from git..."
+            rm -rf "$package_dir"  # Remove any existing copy
+            git clone "$repo_url" "$package_dir"
+            print_info "✓ $package_name package installed from git"
+        else
+            print_info "✓ $package_name package already installed from git"
+        fi
+    done
+    
+    # Install static packages from dotfiles (skip git-managed ones)
     if [[ -d "$DOTFILES_DIR/emacs/packages" ]]; then
         for package in "$DOTFILES_DIR/emacs/packages"/*; do
             if [[ -d "$package" ]]; then
                 local package_name=$(basename "$package")
-                # Skip packages that should be cloned from git
-                if [[ "$package_name" != "macrursors" ]]; then
+                # Skip packages that are managed via git
+                if [[ ! -v "GIT_PACKAGES[$package_name]" ]]; then
                     create_symlink "$package" "$emacs_dir/packages/$package_name"
                 fi
             fi
         done
     fi
+}
+
+update_git_packages() {
+    local emacs_dir="$HOME/.emacs.d"
     
-    # Clone macrursors package from git (for updates)
-    local macrursors_dir="$emacs_dir/packages/macrursors"
-    if [[ ! -d "$macrursors_dir/.git" ]]; then
-        print_info "Installing macrursors package from git..."
-        rm -rf "$macrursors_dir"  # Remove any existing copy
-        git clone https://github.com/corytertel/macrursors "$macrursors_dir"
-        print_info "✓ macrursors package installed from git"
-    else
-        print_info "✓ macrursors package already installed from git"
-    fi
+    print_info "Updating git-based Emacs packages..."
+    
+    for package_name in "${!GIT_PACKAGES[@]}"; do
+        local package_dir="$emacs_dir/packages/$package_name"
+        
+        if [[ -d "$package_dir/.git" ]]; then
+            print_info "Updating $package_name..."
+            cd "$package_dir" && git pull origin main 2>/dev/null || git pull origin master 2>/dev/null
+            print_info "✓ $package_name updated"
+        else
+            print_warning "$package_name not found or not a git repository"
+        fi
+    done
+    
+    cd "$DOTFILES_DIR"  # Return to dotfiles directory
 }
 
 main() {
     print_info "Installing dotfiles..."
+    
+    # Handle update command
+    if [[ "${1:-}" == "update" ]]; then
+        update_git_packages
+        exit 0
+    fi
     
     # Check dependencies first
     if ! check_dependencies; then
@@ -270,6 +310,35 @@ main() {
     fi
     
     print_info "Reload Hyprland with: hyprctl reload"
+    print_info "Update git packages with: $0 update"
 }
 
-main "$@"
+show_usage() {
+    echo "Usage: $0 [COMMAND]"
+    echo ""
+    echo "Commands:"
+    echo "  install     Install dotfiles (default)"
+    echo "  update      Update git-based packages"
+    echo ""
+    echo "Examples:"
+    echo "  $0          # Install dotfiles"
+    echo "  $0 update   # Update git packages"
+}
+
+# Handle help and unknown commands
+case "${1:-install}" in
+    "install"|"")
+        main "$@"
+        ;;
+    "update")
+        main "$@"
+        ;;
+    "help"|"-h"|"--help")
+        show_usage
+        ;;
+    *)
+        print_warning "Unknown command: $1"
+        show_usage
+        exit 1
+        ;;
+esac
