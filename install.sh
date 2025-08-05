@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Minimal dotfiles installation script
+# Cross-platform dotfiles installation script
 set -euo pipefail
 
 DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -10,10 +10,12 @@ CONFIG_DIR="$HOME/.config"
 # Colors
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
 NC='\033[0m'
 
 print_info() { echo -e "${GREEN}[INFO]${NC} $1"; }
 print_warning() { echo -e "${YELLOW}[WARN]${NC} $1"; }
+print_debug() { echo -e "${BLUE}[DEBUG]${NC} $1"; }
 
 ask_confirmation() {
     read -p "$(echo -e "${YELLOW}$1${NC} (y/N): ")" -n 1 -r
@@ -21,12 +23,66 @@ ask_confirmation() {
     [[ $REPLY =~ ^[Yy]$ ]]
 }
 
+# OS Detection
+detect_os() {
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        echo "macos"
+    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        if command -v pacman >/dev/null 2>&1; then
+            echo "linux/arch"
+        elif command -v apt >/dev/null 2>&1; then
+            echo "linux/debian"
+        elif command -v dnf >/dev/null 2>&1; then
+            echo "linux/fedora"
+        else
+            echo "linux/generic"
+        fi
+    else
+        echo "unknown"
+    fi
+}
+
+# Platform-specific package managers
+install_packages() {
+    local packages=("$@")
+    local os=$(detect_os)
+    
+    if [[ ${#packages[@]} -eq 0 ]]; then
+        return 0
+    fi
+    
+    print_info "Installing packages: ${packages[*]}"
+    
+    case "$os" in
+        "macos")
+            if command -v brew >/dev/null 2>&1; then
+                brew install "${packages[@]}"
+            else
+                print_warning "Homebrew not found. Please install: ${packages[*]}"
+                return 1
+            fi
+            ;;
+        "linux/arch")
+            sudo pacman -S --noconfirm "${packages[@]}"
+            ;;
+        "linux/debian")
+            sudo apt update && sudo apt install -y "${packages[@]}"
+            ;;
+        "linux/fedora")
+            sudo dnf install -y "${packages[@]}"
+            ;;
+        *)
+            print_warning "Unknown OS. Please install manually: ${packages[*]}"
+            return 1
+            ;;
+    esac
+}
+
 # Define git-based packages globally (name:repo_url)
 declare -A GIT_PACKAGES=(
     ["macrursors"]="https://github.com/corytertel/macrursors"
     # Add more git packages here as needed:
     # ["some-package"]="https://github.com/user/repo"
-    # ["another-package"]="https://github.com/user/another-repo"
 )
 
 backup_if_exists() {
@@ -43,7 +99,7 @@ create_symlink() {
     local target="$2"
     
     if [[ -L "$target" && "$(readlink "$target")" == "$source" ]]; then
-        print_info "✓ $target already linked correctly"
+        print_debug "✓ $target already linked correctly"
         return 0
     fi
     
@@ -63,42 +119,48 @@ create_symlink() {
 }
 
 check_dependencies() {
+    local os=$(detect_os)
     local missing_packages=()
     
-    # Check for required packages
+    # Common dependencies
     if ! command -v unzip >/dev/null 2>&1; then
         missing_packages+=("unzip")
     fi
     
     if ! command -v wget >/dev/null 2>&1 && ! command -v curl >/dev/null 2>&1; then
-        missing_packages+=("wget")
+        if [[ "$os" == "macos" ]]; then
+            missing_packages+=("wget")
+        else
+            missing_packages+=("wget")
+        fi
     fi
     
-    # Check for ripgrep for helm search
+    # Ripgrep for helm search
     if ! command -v rg >/dev/null 2>&1; then
         missing_packages+=("ripgrep")
     fi
     
-    # Check for ssh-askpass for git operations
-    if ! command -v ssh-askpass >/dev/null 2>&1; then
-        missing_packages+=("openssh-askpass")
+    # Git (should be available but check anyway)
+    if ! command -v git >/dev/null 2>&1; then
+        missing_packages+=("git")
     fi
     
+    # Platform-specific dependencies
+    case "$os" in
+        "linux/arch")
+            # SSH askpass for Wayland (skip on X11)
+            if [[ -n "${WAYLAND_DISPLAY:-}" ]] && ! command -v ssh-askpass >/dev/null 2>&1; then
+                # No need for ssh-askpass on Wayland, skip
+                :
+            fi
+            ;;
+        "macos")
+            # macOS-specific checks could go here
+            ;;
+    esac
+    
     if [[ ${#missing_packages[@]} -gt 0 ]]; then
-        print_info "Installing missing packages: ${missing_packages[*]}"
-        
-        # Detect package manager and install
-        if command -v pacman >/dev/null 2>&1; then
-            sudo pacman -S --noconfirm "${missing_packages[@]}"
-        elif command -v apt >/dev/null 2>&1; then
-            sudo apt update && sudo apt install -y "${missing_packages[@]}"
-        elif command -v dnf >/dev/null 2>&1; then
-            sudo dnf install -y "${missing_packages[@]}"
-        else
-            print_warning "Unknown package manager. Please install manually: ${missing_packages[*]}"
-            return 1
-        fi
-        
+        install_packages "${missing_packages[@]}"
         print_info "✓ Dependencies installed"
     fi
     
@@ -106,11 +168,22 @@ check_dependencies() {
 }
 
 install_fonts() {
-    local fonts_dir="$HOME/.local/share/fonts"
+    local os=$(detect_os)
+    local fonts_dir
+    
+    case "$os" in
+        "macos")
+            fonts_dir="$HOME/Library/Fonts"
+            ;;
+        *)
+            fonts_dir="$HOME/.local/share/fonts"
+            ;;
+    esac
+    
     mkdir -p "$fonts_dir"
     
     # Install Iosevka font
-    if ! fc-list | grep -i "iosevka" > /dev/null; then
+    if ! fc-list | grep -i "iosevka" > /dev/null 2>&1; then
         print_info "Installing Iosevka font..."
         
         local temp_dir=$(mktemp -d)
@@ -124,16 +197,19 @@ install_fonts() {
         
         unzip -q "$temp_dir/iosevka.zip" -d "$temp_dir"
         cp "$temp_dir"/*.ttc "$fonts_dir/" 2>/dev/null || true
-        fc-cache -fv
+        
+        if [[ "$os" != "macos" ]]; then
+            fc-cache -fv
+        fi
         print_info "✓ Iosevka font installed"
         
         rm -rf "$temp_dir"
     else
-        print_info "✓ Iosevka font already installed"
+        print_debug "✓ Iosevka font already installed"
     fi
     
-    # Install JetBrains Mono Nerd Font for waybar icons
-    if ! fc-list | grep -i "jetbrainsmono nerd font" > /dev/null; then
+    # Install JetBrains Mono Nerd Font for waybar icons (Linux only)
+    if [[ "$os" != "macos" ]] && ! fc-list | grep -i "jetbrainsmono nerd font" > /dev/null 2>&1; then
         print_info "Installing JetBrains Mono Nerd Font..."
         
         local temp_dir=$(mktemp -d)
@@ -151,8 +227,10 @@ install_fonts() {
         print_info "✓ JetBrains Mono Nerd Font installed"
         
         rm -rf "$temp_dir"
+    elif [[ "$os" == "macos" ]]; then
+        print_debug "✓ Skipping JetBrains Mono Nerd Font on macOS (not needed)"
     else
-        print_info "✓ JetBrains Mono Nerd Font already installed"
+        print_debug "✓ JetBrains Mono Nerd Font already installed"
     fi
 }
 
@@ -184,15 +262,13 @@ install_emacs() {
     
     # Link individual emacs config files
     for file in "${EMACS_FILES[@]}"; do
-        if [[ -f "$DOTFILES_DIR/emacs/$file" ]]; then
-            create_symlink "$DOTFILES_DIR/emacs/$file" "$emacs_dir/$file"
+        if [[ -f "$DOTFILES_DIR/common/config/emacs/$file" ]]; then
+            create_symlink "$DOTFILES_DIR/common/config/emacs/$file" "$emacs_dir/$file"
         fi
     done
     
     # Create packages directory
     mkdir -p "$emacs_dir/packages"
-    
-    # Git packages are defined globally at the top of the script
     
     # Install git-based packages
     for package_name in "${!GIT_PACKAGES[@]}"; do
@@ -205,19 +281,46 @@ install_emacs() {
             git clone "$repo_url" "$package_dir"
             print_info "✓ $package_name package installed from git"
         else
-            print_info "✓ $package_name package already installed from git"
+            print_debug "✓ $package_name package already installed from git"
         fi
     done
     
     # Install static packages from dotfiles (skip git-managed ones)
-    if [[ -d "$DOTFILES_DIR/emacs/packages" ]]; then
-        for package in "$DOTFILES_DIR/emacs/packages"/*; do
+    if [[ -d "$DOTFILES_DIR/common/config/emacs/packages" ]]; then
+        for package in "$DOTFILES_DIR/common/config/emacs/packages"/*; do
             if [[ -d "$package" ]]; then
                 local package_name=$(basename "$package")
                 # Skip packages that are managed via git
                 if [[ ! -v "GIT_PACKAGES[$package_name]" ]]; then
                     create_symlink "$package" "$emacs_dir/packages/$package_name"
                 fi
+            fi
+        done
+    fi
+}
+
+install_platform_configs() {
+    local os=$(detect_os)
+    local platform_dir="$DOTFILES_DIR/$os"
+    
+    print_info "Installing configurations for: $os"
+    
+    # Install platform-specific configs
+    if [[ -d "$platform_dir/config" ]]; then
+        for config in "$platform_dir/config"/*; do
+            if [[ -d "$config" ]]; then
+                local config_name=$(basename "$config")
+                create_symlink "$config" "$CONFIG_DIR/$config_name"
+            fi
+        done
+    fi
+    
+    # Install platform-specific scripts
+    if [[ -d "$platform_dir/scripts" ]]; then
+        mkdir -p "$HOME/.local/bin"
+        for script in "$platform_dir/scripts"/*; do
+            if [[ -f "$script" ]]; then
+                create_symlink "$script" "$HOME/.local/bin/$(basename "$script")"
             fi
         done
     fi
@@ -233,18 +336,17 @@ update_git_packages() {
         
         if [[ -d "$package_dir/.git" ]]; then
             print_info "Updating $package_name..."
-            cd "$package_dir" && git pull origin main 2>/dev/null || git pull origin master 2>/dev/null
+            (cd "$package_dir" && git pull origin main 2>/dev/null || git pull origin master 2>/dev/null)
             print_info "✓ $package_name updated"
         else
             print_warning "$package_name not found or not a git repository"
         fi
     done
-    
-    cd "$DOTFILES_DIR"  # Return to dotfiles directory
 }
 
 main() {
-    print_info "Installing dotfiles..."
+    local os=$(detect_os)
+    print_info "Installing dotfiles on: $os"
     
     # Handle update command
     if [[ "${1:-}" == "update" ]]; then
@@ -259,34 +361,32 @@ main() {
     
     mkdir -p "$CONFIG_DIR"
     
-    # Link config directories
-    declare -a CONFIG_DIRS=(
-        "hypr:$CONFIG_DIR/hypr"
-        "waybar:$CONFIG_DIR/waybar"
-        "kitty:$CONFIG_DIR/kitty"
-    )
+    # Install common shell configs
+    if [[ -f "$DOTFILES_DIR/common/shell/bashrc" ]]; then
+        create_symlink "$DOTFILES_DIR/common/shell/bashrc" "$HOME/.bashrc"
+    fi
     
-    # Link home files
-    declare -a HOME_FILES=(
-        "bashrc:$HOME/.bashrc"
-    )
+    # Install common config directories (emacs, kitty)
+    if [[ -d "$DOTFILES_DIR/common/config" ]]; then
+        for config in "$DOTFILES_DIR/common/config"/*; do
+            if [[ -d "$config" ]]; then
+                local config_name=$(basename "$config")
+                case "$config_name" in
+                    "emacs")
+                        # Handle emacs separately
+                        ;;
+                    "kitty")
+                        create_symlink "$config" "$CONFIG_DIR/$config_name"
+                        ;;
+                    *)
+                        create_symlink "$config" "$CONFIG_DIR/$config_name"
+                        ;;
+                esac
+            fi
+        done
+    fi
     
-    for item in "${CONFIG_DIRS[@]}"; do
-        IFS=':' read -r source target <<< "$item"
-        if [[ -d "$DOTFILES_DIR/$source" ]]; then
-            create_symlink "$DOTFILES_DIR/$source" "$target"
-        fi
-    done
-    
-    # Link home files
-    for item in "${HOME_FILES[@]}"; do
-        IFS=':' read -r source target <<< "$item"
-        if [[ -f "$DOTFILES_DIR/$source" ]]; then
-            create_symlink "$DOTFILES_DIR/$source" "$target"
-        fi
-    done
-    
-    # Link bin files
+    # Install bin files
     if [[ -d "$DOTFILES_DIR/bin" ]]; then
         mkdir -p "$HOME/.local/bin"
         for bin_file in "$DOTFILES_DIR/bin"/*; do
@@ -300,28 +400,46 @@ main() {
     install_fonts
     
     # Install Emacs configuration
-    if [[ -d "$DOTFILES_DIR/emacs" ]]; then
+    if [[ -d "$DOTFILES_DIR/common/config/emacs" ]]; then
         install_emacs
     fi
+    
+    # Install platform-specific configurations
+    install_platform_configs
     
     print_info "Installation complete!"
     if [[ -d "$BACKUP_DIR" ]]; then
         print_info "Backups saved to: $BACKUP_DIR"
     fi
     
-    print_info "Reload Hyprland with: hyprctl reload"
+    # Platform-specific completion messages
+    case "$os" in
+        "linux/arch")
+            print_info "Reload Hyprland with: hyprctl reload"
+            ;;
+        "macos")
+            print_info "Restart Terminal or run: source ~/.bashrc"
+            ;;
+    esac
+    
     print_info "Update git packages with: $0 update"
 }
 
 show_usage() {
+    echo "Cross-platform dotfiles installer"
     echo "Usage: $0 [COMMAND]"
     echo ""
     echo "Commands:"
     echo "  install     Install dotfiles (default)"
     echo "  update      Update git-based packages"
     echo ""
+    echo "Supported platforms:"
+    echo "  - macOS (emacs, kitty, shell)"
+    echo "  - Arch Linux (emacs, kitty, shell, hyprland, waybar)"
+    echo "  - Other Linux distros (basic support)"
+    echo ""
     echo "Examples:"
-    echo "  $0          # Install dotfiles"
+    echo "  $0          # Install dotfiles for current platform"
     echo "  $0 update   # Update git packages"
 }
 
