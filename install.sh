@@ -66,9 +66,14 @@ check_dependencies() {
         missing_packages+=("wget")
     fi
     
-    # Check for ag (the silver searcher) for helm-ag
-    if ! command -v ag >/dev/null 2>&1; then
-        missing_packages+=("the_silver_searcher")
+    # Check for ripgrep for helm search
+    if ! command -v rg >/dev/null 2>&1; then
+        missing_packages+=("ripgrep")
+    fi
+    
+    # Check for ssh-askpass for git operations
+    if ! command -v ssh-askpass >/dev/null 2>&1; then
+        missing_packages+=("openssh-askpass")
     fi
     
     if [[ ${#missing_packages[@]} -gt 0 ]]; then
