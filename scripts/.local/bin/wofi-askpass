@@ -1,3 +1,0 @@
-#!/bin/bash
-# Simple askpass script using wofi
-wofi --dmenu --password --prompt="Password:" --cache-file=/dev/null

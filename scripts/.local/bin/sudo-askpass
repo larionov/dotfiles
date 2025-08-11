@@ -1,0 +1,16 @@
+#!/bin/bash
+# Simple askpass helper for sudo
+# Uses zenity for GUI or falls back to terminal
+
+if [ -n "$DISPLAY" ] && command -v zenity >/dev/null 2>&1; then
+    # GUI environment with zenity available
+    zenity --password --title="sudo" --text="[sudo] password for $USER:"
+elif [ -n "$DISPLAY" ] && command -v kdialog >/dev/null 2>&1; then
+    # KDE environment
+    kdialog --password "[sudo] password for $USER:"
+else
+    # Fallback: try terminal input
+    echo "[sudo] password for $USER:" >&2
+    read -s password
+    echo "$password"
+fi

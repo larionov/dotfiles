@@ -124,6 +124,18 @@ check_dependencies() {
             if ! command -v wofi >/dev/null 2>&1; then
                 missing_packages+=("wofi")
             fi
+            if ! command -v pass >/dev/null 2>&1; then
+                missing_packages+=("pass")
+            fi
+            if ! command -v wl-copy >/dev/null 2>&1; then
+                missing_packages+=("wl-clipboard")
+            fi
+            if ! command -v hyprpolkitagent >/dev/null 2>&1; then
+                missing_packages+=("hyprpolkitagent")
+            fi
+            if ! command -v zenity >/dev/null 2>&1; then
+                missing_packages+=("zenity")
+            fi
             ;;
     esac
     
@@ -465,9 +477,15 @@ main() {
         print_info "Backups saved to: $BACKUP_DIR"
     fi
     
-    # Platform-specific completion messages
+    # Platform-specific setup
     case "$os" in
         "linux/arch")
+            # Enable hyprpolkitagent systemd service
+            if command -v hyprpolkitagent >/dev/null 2>&1; then
+                systemctl --user enable hyprpolkitagent.service
+                systemctl --user start hyprpolkitagent.service
+                print_info "✓ hyprpolkitagent service enabled"
+            fi
             print_info "Reload Hyprland with: hyprctl reload"
             ;;
         "macos")
