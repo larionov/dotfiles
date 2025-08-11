@@ -1,0 +1,5 @@
+# Reduce touchpad tap-to-drag timeout for ELAN touchpad
+# This rule sets libinput Tapping Drag Lock to reduce drag timeout
+SUBSYSTEM=="input", ATTRS{name}=="ELAN0676:00 04F3:3195 Touchpad", \
+  ENV{LIBINPUT_PROP_TAP_DRAG_LOCK}="1", \
+  ENV{LIBINPUT_PROP_TAP_DRAG_TIMEOUT}="100"

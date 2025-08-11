@@ -1,0 +1,23 @@
+# Files and directories to ignore when stowing
+\.git
+\.gitignore
+README\.md
+LICENSE
+CHANGELOG\.md
+install\.sh
+\.stow-local-ignore
+
+# Temporary and backup files
+.*~
+.*\.bak
+.*\.tmp
+.*\.log
+
+# OS-specific files
+\.DS_Store
+Thumbs\.db
+
+# Editor files
+.*\.swp
+.*\.swo
+\#.*\#

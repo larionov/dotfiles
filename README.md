@@ -1,128 +1,191 @@
-# Cross-Platform Dotfiles
+# Dotfiles - GNU Stow Edition
 
-Modern cross-platform dotfiles configuration supporting macOS and Linux with automatic OS detection and platform-specific installations.
+A clean, modern dotfiles management system using GNU Stow for cross-platform configuration management.
 
-## Supported Platforms
+## Structure
 
-### ✅ Full Support
-- **macOS**: Emacs, Kitty, Shell configuration
-- **Arch Linux**: Emacs, Kitty, Shell, Hyprland, Waybar, thermal management
-
-### ⚡ Basic Support  
-- **Other Linux distros**: Emacs, Kitty, Shell configuration
-
-## Directory Structure
+Each configuration is organized as a "Stow package" - a directory containing files in the same structure as they would appear in your home directory:
 
 ```
-dotfiles/
-├── common/                 # Cross-platform configurations
-│   ├── config/
-│   │   ├── emacs/         # Emacs configuration (all platforms)
-│   │   └── kitty/         # Kitty terminal (all platforms)
-│   ├── shell/
-│   │   └── bashrc         # Bash configuration
-│   └── scripts/           # Common scripts
-├── linux/
-│   └── arch/              # Arch Linux specific
-│       ├── config/
-│       │   ├── hypr/      # Hyprland window manager
-│       │   └── waybar/    # Status bar
-│       └── scripts/       # Arch-specific scripts
-├── macos/                 # macOS specific configurations
-│   ├── config/            # macOS app configs
-│   └── scripts/           # macOS-specific scripts
-└── bin/                   # Universal binaries/scripts
+dotfiles-stow/
+├── bash/                    # Shell configuration
+│   └── .bashrc
+├── kitty/                   # Terminal emulator
+│   └── .config/kitty/kitty.conf
+├── emacs/                   # Emacs editor
+│   └── .emacs.d/
+│       ├── *.el             # Configuration files
+│       └── packages/        # Custom packages
+├── hyprland/               # Wayland compositor (Linux)
+│   └── .config/hypr/hyprland.conf
+├── waybar/                 # Status bar (Linux)
+│   └── .config/waybar/
+├── dunst/                  # Notifications (Linux)
+│   └── .config/dunst/dunstrc
+├── scripts/                # User scripts
+│   └── .local/bin/
+└── install.sh              # Installation script
 ```
 
-## Quick Start
+## Installation
+
+### Prerequisites
+
+GNU Stow is required and will be automatically installed if missing.
+
+### Quick Start
 
 ```bash
-# Clone the repository
-git clone https://github.com/larionov/dotfiles.git
-cd dotfiles
-
-# Install for your platform (auto-detected)
+cd ~/Sync/dotfiles-stow
 ./install.sh
-
-# Install with optional Iosevka font
-INSTALL_IOSEVKA=true ./install.sh
-
-# Update git-based packages
-./install.sh update
-
-# Get help
-./install.sh help
 ```
+
+### Commands
+
+```bash
+./install.sh                # Install all packages
+./install.sh uninstall      # Remove all symlinks
+./install.sh restow         # Remove and reinstall (useful after updates)
+./install.sh update         # Update git-based packages
+./install.sh help           # Show usage information
+```
+
+### Environment Variables
+
+```bash
+INSTALL_IOSEVKA=true ./install.sh    # Install optional Iosevka font
+```
+
+## How It Works
+
+1. **GNU Stow** creates symbolic links from each package to your home directory
+2. **Dependencies** are automatically installed (stow, fonts, system packages)
+3. **Backups** are created for existing configurations before linking
+4. **Platform detection** installs appropriate packages (Linux/macOS)
+
+## Package Management
+
+### Installing Individual Packages
+
+```bash
+cd ~/Sync/dotfiles-stow
+stow bash        # Install just bash configuration
+stow kitty       # Install just kitty configuration
+stow emacs       # Install just Emacs configuration
+```
+
+### Removing Individual Packages
+
+```bash
+stow -D bash     # Remove bash configuration links
+stow -D emacs    # Remove Emacs configuration links
+```
+
+### Platform-Specific Packages
+
+- **Universal**: bash, kitty, emacs, scripts
+- **Linux Only**: hyprland, waybar, dunst  
+- **macOS Only**: (none currently)
 
 ## Features
 
-### 🎯 Smart Platform Detection
-- Automatically detects macOS, Arch Linux, Debian/Ubuntu, Fedora
-- Only installs relevant configurations for your platform
-- Platform-specific package manager integration
+### Automatic Package Installation
 
-### 📦 Flexible Package Management
-- **Git packages**: Fresh from upstream (e.g., macrursors)
-- **Static packages**: Versioned in dotfiles (e.g., dired+)
-- Easy to add new packages via configuration array
+The installer automatically detects your platform and installs required packages:
 
-### 🔄 Cross-Platform Font Management
-- **macOS**: `~/Library/Fonts`
-- **Linux**: `~/.local/share/fonts` with font cache refresh
-- **Default**: FiraMono Nerd Font (clean monospace with icons)
-- **Optional**: Iosevka font (`INSTALL_IOSEVKA=true`)
-- **Linux-only**: JetBrains Mono Nerd Font for Waybar icons
+- **Arch Linux**: `stow`, `dunst`, `libnotify`, `wofi`, `ripgrep`
+- **macOS**: `stow` (via Homebrew), `ripgrep`
+- **Other Linux**: `stow`, `ripgrep`
 
-### ⚙️ Intelligent Configuration Linking
-- Backs up existing configurations
-- Creates symlinks for easy maintenance
-- Platform-specific exclusions (no Hyprland on macOS)
+### Font Management
 
-## Configuration
+Automatically downloads and installs:
 
-### Adding Git Packages
-Edit the `GIT_PACKAGES` array in `install.sh`:
+- **FiraMono Nerd Font** (default terminal font)
+- **JetBrains Mono Nerd Font** (Linux only, for Waybar icons)
+- **Iosevka** (optional, set `INSTALL_IOSEVKA=true`)
 
-```bash
-declare -A GIT_PACKAGES=(
-    ["macrursors"]="https://github.com/corytertel/macrursors"
-    ["your-package"]="https://github.com/user/repo"
-)
+### Emacs Integration
+
+- Uses [minimal-emacs.d](https://github.com/jamescherti/minimal-emacs.d) as base
+- Git packages (macrursors) are automatically cloned and updated
+- Custom configuration files are stowed on top
+
+### Backup System
+
+Before installing, existing configurations are backed up to timestamped directories like `~/.dotfiles_backup_20250808_143022/`.
+
+## Supported Platforms
+
+- **Arch Linux** (full support: Hyprland, Waybar, Dunst)
+- **macOS** (basic support: terminal, shell, Emacs)
+- **Other Linux** (basic support: terminal, shell, Emacs)
+
+## Migration from Old System
+
+If you're migrating from a previous dotfiles system:
+
+1. **Backup** your current configs: `cp -r ~/.config ~/.config.backup`
+2. **Run installer**: `./install.sh`
+3. **Test configurations** and verify everything works
+4. **Remove backups** when satisfied
+
+## Customization
+
+### Adding New Packages
+
+1. Create a new directory: `mkdir mypackage`
+2. Add files with proper structure: `mypackage/.config/myapp/config`
+3. Install: `stow mypackage`
+
+### Modifying Existing Packages
+
+1. Edit files in the package directory
+2. Restow: `stow -R packagename` or `./install.sh restow`
+
+### Ignoring Files
+
+Create `.stow-local-ignore` in any package to exclude files:
+
+```
+\.git
+README.md
+*.tmp
 ```
 
-### Platform-Specific Configs
-- Add macOS configs to `macos/config/`
-- Add Linux configs to `linux/arch/config/` 
-- Common configs go in `common/config/`
+## Troubleshooting
 
-## Emacs Configuration
+### Conflicts
 
-Uses [minimal-emacs.d](https://github.com/jamescherti/minimal-emacs.d) as base with:
-- Modern completion (Vertico, Consult, Orderless)
-- Built-in `helm-do-grep-ag` with ripgrep backend
-- In-place search result editing with wgrep
-- Multi-cursor support via macrursors
-- Cross-platform compatibility
+If Stow reports conflicts (existing files/directories):
 
-### Search & Edit Workflow
-1. `C-c f` - Search with helm-do-grep-ag
-2. `C-x C-s` - Save results to buffer
-3. `C-c C-p` - Make buffer editable (wgrep)
-4. Make changes directly in results
-5. `C-c C-e` - Apply changes to files
+1. **Check what exists**: `ls -la ~/.config/conflicting-app`
+2. **Backup if needed**: `mv ~/.config/app ~/.config/app.backup`
+3. **Restow**: `stow -R packagename`
 
-## Dependencies
+### Missing Dependencies
 
-### Automatically Installed
-- `unzip`, `wget`/`curl`, `git`
-- `ripgrep` (for fast searching)
-- Platform-specific packages via package managers
+If packages fail to install:
 
-### Required
-- **macOS**: Homebrew
-- **Arch Linux**: pacman (standard)
-- **Other Linux**: apt/dnf support
+1. **Check your package manager** is working
+2. **Install manually**: `sudo pacman -S stow` (Arch) or `brew install stow` (macOS)
+3. **Re-run installer**: `./install.sh`
 
-## License
+### Permission Issues
 
-MIT License - See individual package licenses for third-party components.
+Scripts need execute permissions:
+
+```bash
+chmod +x ~/.local/bin/*
+```
+
+## Philosophy
+
+This system follows the Unix philosophy of "do one thing well":
+
+- **GNU Stow** handles symlink management
+- **Install script** handles dependencies and setup
+- **Package structure** mirrors home directory layout
+- **Version control** tracks all configurations
+
+Clean, simple, and maintainable.

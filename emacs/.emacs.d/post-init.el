@@ -407,7 +407,7 @@
 ;;    ("M-e" . dirvish-emerge-menu)
 ;;    ("M-j" . dirvish-fd-jump)))
 
-(global-set-key (kbd "C-x C-f") 'dired-jump)
+(global-set-key (kbd "M-s") 'dired-jump)
 (global-set-key (kbd "C-x C-d") 'ibuffer)
 
 
