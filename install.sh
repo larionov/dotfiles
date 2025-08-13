@@ -124,12 +124,6 @@ check_dependencies() {
             if ! command -v wofi >/dev/null 2>&1; then
                 missing_packages+=("wofi")
             fi
-            if ! command -v pass >/dev/null 2>&1; then
-                missing_packages+=("pass")
-            fi
-            if ! command -v wl-copy >/dev/null 2>&1; then
-                missing_packages+=("wl-clipboard")
-            fi
             if ! command -v hyprpolkitagent >/dev/null 2>&1; then
                 missing_packages+=("hyprpolkitagent")
             fi
