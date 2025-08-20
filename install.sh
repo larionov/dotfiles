@@ -130,6 +130,17 @@ check_dependencies() {
             if ! command -v zenity >/dev/null 2>&1; then
                 missing_packages+=("zenity")
             fi
+
+            if ! command -v io.elementary.settings > /dev/null 2>&1; then
+                missing_packages+=("switchboard")
+            fi
+
+            if [[ ! -f "/usr/lib/switchboard-3/network/libnetwork.so" ]]; then
+                missing_packages+=("switchboard-plug-network")
+            fi    
+            if [[ ! -f "usr/lib/switchboard-3/network/libbluetooth.so" ]]; then
+                missing_packages+=("switchboard-plug-bluetooth")
+            fi    
             ;;
     esac
     

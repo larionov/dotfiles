@@ -1,3 +1,5 @@
 emacs/.git/
 emacs/**/.git/
+emacs/.emacs.d/packages
 .git
+.DS_Store
