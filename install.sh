@@ -94,10 +94,15 @@ check_dependencies() {
             *) print_error "Please install GNU Stow manually"; exit 1 ;;
         esac
     fi
+
     
     # Common dependencies
     if ! command -v unzip >/dev/null 2>&1; then
         missing_packages+=("unzip")
+    fi
+
+    if ! command -v ark >/dev/null 2>&1; then
+        missing_packages+=("ark")
     fi
     
     if ! command -v wget >/dev/null 2>&1 && ! command -v curl >/dev/null 2>&1; then
@@ -130,6 +135,9 @@ check_dependencies() {
             if ! command -v zenity >/dev/null 2>&1; then
                 missing_packages+=("zenity")
             fi
+            if ! command -v hyprlock >/dev/null 2>&1; then
+                missing_packages+=("hyprlock")
+            fi
 
             if ! command -v io.elementary.settings > /dev/null 2>&1; then
                 missing_packages+=("switchboard")
@@ -137,10 +145,15 @@ check_dependencies() {
 
             if [[ ! -f "/usr/lib/switchboard-3/network/libnetwork.so" ]]; then
                 missing_packages+=("switchboard-plug-network")
-            fi    
-            if [[ ! -f "usr/lib/switchboard-3/network/libbluetooth.so" ]]; then
+            fi
+            
+            if [[ ! -f "/usr/lib/switchboard-3/network/libbluetooth.so" ]]; then
                 missing_packages+=("switchboard-plug-bluetooth")
-            fi    
+            fi
+            
+            if ! command -v xdg_menu >/dev/null 2>&1; then
+                missing_packages+=("archlinux-xdg-menu")
+            fi
             ;;
     esac
     
@@ -323,7 +336,7 @@ stow_packages() {
     # Platform-specific packages
     case "$os" in
         "linux/arch")
-            packages+=("hyprland" "waybar" "dunst")
+            packages+=("hyprland" "waybar" "dunst" "hyprlock")
             # Machine-specific packages
             local machine_id=""
             if [[ -f /etc/machine-id ]]; then
@@ -379,7 +392,7 @@ unstow_packages() {
     # Platform-specific packages
     case "$os" in
         "linux/arch")
-            packages+=("hyprland" "waybar" "dunst")
+            packages+=("hyprland" "waybar" "dunst" "hyprlock")
             # Machine-specific packages
             local machine_id=""
             if [[ -f /etc/machine-id ]]; then
@@ -492,7 +505,10 @@ main() {
                 print_info "✓ hyprpolkitagent service enabled"
             fi
             print_info "Reload Hyprland with: hyprctl reload"
+
+            XDG_MENU_PREFIX=arch- kbuildsycoca6
             ;;
+        
         "macos")
             print_info "Restart Terminal or run: source ~/.bashrc"
             ;;
