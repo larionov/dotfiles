@@ -3,7 +3,27 @@
   :init
   (exec-path-from-shell-initialize))
 
+;; Add Go bin to exec-path
+(add-to-list 'exec-path (expand-file-name "~/go/bin"))
+
 (setq auto-revert-remote-files t)
+
+;; Project management with built-in project.el
+(use-package project
+  :ensure nil  ; builtin
+  :bind (("C-c p f" . project-find-file)
+         ("C-c p p" . project-switch-project)
+         ("C-c p b" . consult-project-buffer)
+         ("C-c p g" . consult-ripgrep)
+         ("C-c p d" . project-dired))
+  :custom
+  ;; Where to search for projects
+  (project-switch-commands
+   '((project-find-file "Find file")
+     (consult-project-buffer "Buffer")
+     (consult-ripgrep "Ripgrep")
+     (project-dired "Dired")
+     (magit "Magit"))))
 (use-package which-key
   :ensure nil ; builtin
   :defer t
@@ -261,9 +281,21 @@
   ;; session is loaded after all other packages. (Using 103/102 is particularly
   ;; useful for those using minimal-emacs.d, where some optimizations restore
   ;; `file-name-handler-alist` at depth 101 during `emacs-startup-hook`.)
-  ;; Disabled geometry loading to prevent two windows issue
-  ;; (add-hook 'emacs-startup-hook #'easysession-load-including-geometry 102)
-  (add-hook 'emacs-startup-hook #'easysession-save-mode 103))
+  (add-hook 'emacs-startup-hook #'easysession-load-including-geometry 102)
+  (add-hook 'emacs-startup-hook #'easysession-save-mode 103)
+
+  :config
+  ;; Auto-create session based on project directory
+  (defun my/easysession-auto-save-on-project-switch ()
+    "Automatically save/load session when switching projects."
+    (when (project-current)
+      (let* ((project-root (project-root (project-current)))
+             (session-name (file-name-nondirectory (directory-file-name project-root))))
+        (easysession-switch-to session-name))))
+
+  ;; Hook into project switching
+  (advice-add 'project-switch-project :after
+              (lambda (&rest _) (my/easysession-auto-save-on-project-switch))))
 
 
 
@@ -328,6 +360,9 @@
 ;; closing windows.
 (winner-mode 1)
 
+;; Easy window navigation with Cmd+Arrow keys
+(windmove-default-keybindings 'super)
+
 ;; Replace selected text with typed text
 (delete-selection-mode 1)
 
@@ -359,7 +394,37 @@
   :defer t)
 (use-package go-mode
   :ensure t
-  :defer t)
+  :defer t
+  :hook ((go-mode . eglot-ensure)
+         (go-ts-mode . eglot-ensure))
+  :bind (:map go-mode-map
+              ("M-?" . xref-find-references)     ; Find all references
+              ("C-c C-d" . eldoc-doc-buffer)     ; Show documentation
+              ("C-c ! n" . flymake-goto-next-error)      ; Next error
+              ("C-c ! p" . flymake-goto-prev-error)      ; Previous error
+              ("C-c ! l" . flymake-show-buffer-diagnostics) ; List all errors
+              ("C-c ! e" . flymake-show-diagnostic))     ; Show error at point
+  :config
+  ;; Set gofmt as the format command
+  (setq gofmt-command "gofmt")
+  ;; Format buffer before saving
+  (add-hook 'before-save-hook
+            (lambda ()
+              (when (eq major-mode 'go-mode)
+                (eglot-format-buffer))))
+
+  ;; Add Go navigation to cheat-sheet
+  (with-eval-after-load 'help
+    (add-to-list 'help-quick-sections
+                 '("Go Navigation"
+                   (xref-find-definitions . "jump to def")
+                   (xref-pop-marker-stack . "jump back")
+                   (xref-find-references . "find refs")
+                   (eldoc-doc-buffer . "show docs")
+                   (eglot-rename . "rename")
+                   (flymake-show-diagnostic . "show error")
+                   (flymake-goto-next-error . "next error")
+                   (flymake-goto-prev-error . "prev error")))))
 
 ;;   :ensure t
 ;;   :defer t
@@ -523,7 +588,18 @@ and for `evil' users, map
 
 ;(use-package claudemacs
 ;  :vc (:url "https://github.com/cpoile/claudemacs"))
+(use-package eat
+  :ensure t
+  :defer t
+  :config
+  ;; Enable true color support
+  (setq eat-term-name "xterm-256color"))
+
 (use-package claude-code :ensure t
   :vc (:url "https://github.com/stevemolitor/claude-code.el" :rev :newest)
-  :config (claude-code-mode)
-  :bind-keymap ("C-c v" . claude-code-command-map)) ;; or your preferred key
+  :config
+  (claude-code-mode)
+  ;; Set environment to force colors in Claude CLI
+  (setenv "FORCE_COLOR" "1")
+  (setenv "COLORTERM" "truecolor")
+  :bind-keymap ("C-c v" . claude-code-command-map))
