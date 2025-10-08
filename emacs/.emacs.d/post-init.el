@@ -1,9 +1,5 @@
 ;;; post-init.el --- DESCRIPTION -*- no-byte-compile: t; lexical-binding: t; -*-
 (use-package exec-path-from-shell
-  :if (memq window-system '(mac ns))  ; Only on macOS
-  :custom
-  (exec-path-from-shell-variables '("PATH" "MANPATH" "DOCKER_CONTEXT" "DOCKER_HOST"))  ; Include Docker vars
-  (exec-path-from-shell-arguments '("-l"))  ; Faster: skip -i (interactive) flag
   :init
   (exec-path-from-shell-initialize))
 
@@ -619,35 +615,16 @@ and for `evil' users, map
 
 ;;(setq dired-listing-switches "-al --group-directories-first")
 
-;; Set Docker context early (before anything loads)
-(setenv "DOCKER_CONTEXT" "colima-updev-vz")
-(setenv "DOCKER_HOST" "unix:///Users/upwork/.colima/updev-vz/docker.sock")
+;; Load TRAMP and Docker/Podman support
+(require 'tramp)
+(require 'tramp-container)
+(tramp-register-file-name-handlers)
 
-;; Register TRAMP handlers after minimal-emacs.d restores file-name-handler-alist
-;; minimal-emacs.d restores at depth 101, so we register at 104
-(add-hook 'emacs-startup-hook
-          (lambda ()
-            (require 'tramp)
-            (require 'tramp-container)
-            (tramp-register-file-name-handlers))
-          104)
-
+;; TRAMP configuration
 (with-eval-after-load 'tramp
   (add-to-list 'tramp-remote-path 'tramp-own-remote-path)
   (add-to-list 'tramp-remote-path "/opt/homebrew/bin")
   (setq explicit-shell-file-name "/bin/bash")
-
-  ;; Disable version control for remote files (speeds up TRAMP, prevents hangs)
-  (setq vc-ignore-dir-regexp
-        (format "\\(%s\\)\\|\\(%s\\)"
-                vc-ignore-dir-regexp
-                tramp-file-name-regexp))
-
-  ;; Performance and reliability settings for TRAMP
-  (setq tramp-verbose 6)  ; Debug mode (1 = errors only, 6 = debug)
-  (setq tramp-use-ssh-controlmaster-options nil)  ; Can cause issues on macOS
-  (setq remote-file-name-inhibit-cache nil)  ; Enable caching
-
   (add-to-list 'tramp-connection-properties
                (list (regexp-quote "/ssh:upwork@macmini.local:")
                      "remote-shell" "/bin/bash --login")))
