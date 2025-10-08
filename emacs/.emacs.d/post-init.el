@@ -248,6 +248,19 @@
   (outline-indent-ellipsis " ▼ "))
 
 
+;; yasnippet - Required for LSP completion with snippet support (e.g., JSON LSP)
+(use-package yasnippet
+  :ensure t
+  :defer t
+  :hook ((prog-mode . yas-minor-mode)
+         (text-mode . yas-minor-mode))
+  :custom
+  (yas-verbosity 2)  ; Reduce verbosity
+  :config
+  ;; Don't expand snippets with TAB, use it for indentation
+  (define-key yas-minor-mode-map (kbd "<tab>") nil)
+  (define-key yas-minor-mode-map (kbd "TAB") nil))
+
 
 (use-package eglot
   :ensure nil
@@ -511,6 +524,15 @@
 
 ;; Enable eglot for JSON
 (add-hook 'json-ts-mode-hook #'eglot-ensure)
+
+;; Auto-format JSON on save using built-in json-pretty-print
+(add-hook 'json-ts-mode-hook
+          (lambda ()
+            (add-hook 'before-save-hook
+                      (lambda ()
+                        (when (eq major-mode 'json-ts-mode)
+                          (json-pretty-print-buffer)))
+                      nil t)))
 
 (use-package go-mode
   :ensure t
