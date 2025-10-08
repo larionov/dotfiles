@@ -3,6 +3,9 @@
 ;; Add MELPA for packages like helm-ag
 (require 'package)
 (add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
+
+;; Disable signature checking (avoids GPG errors)
+(setq package-check-signature nil)
 (custom-set-variables
  ;; custom-set-variables was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.

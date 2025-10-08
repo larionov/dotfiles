@@ -1,5 +1,9 @@
 ;;; post-init.el --- DESCRIPTION -*- no-byte-compile: t; lexical-binding: t; -*-
 (use-package exec-path-from-shell
+  :if (memq window-system '(mac ns))  ; Only on macOS
+  :custom
+  (exec-path-from-shell-variables '("PATH" "MANPATH" "DOCKER_CONTEXT" "DOCKER_HOST"))  ; Include Docker vars
+  (exec-path-from-shell-arguments '("-l"))  ; Faster: skip -i (interactive) flag
   :init
   (exec-path-from-shell-initialize))
 
@@ -255,7 +259,13 @@
   :commands (eglot
              eglot-ensure
              eglot-rename
-             eglot-format-buffer))
+             eglot-format-buffer)
+  :config
+  ;; Use only eglot completions (no buffer words, etc.)
+  (setq completion-category-defaults nil)
+  ;; Improve completion performance
+  (setq eglot-sync-connect nil)
+  (setq eglot-autoshutdown t))
 
 
 (use-package easysession
@@ -309,11 +319,30 @@
          (eshell-mode . corfu-mode))
 
   :custom
+  ;; Corfu behavior
+  (corfu-auto t)                        ; Enable auto completion
+  (corfu-auto-delay 0.2)                ; Delay before showing completions (seconds)
+  (corfu-auto-prefix 2)                 ; Minimum characters to trigger completion
+  (corfu-preview-current nil)           ; Don't preview current candidate
+  (corfu-quit-no-match 'separator)      ; Don't quit if no match, allow typing
+  (corfu-quit-at-boundary 'separator)   ; Don't quit at completion boundary
+  (corfu-cycle t)                       ; Enable cycling through candidates
+
   ;; Hide commands in M-x which do not apply to the current mode.
   (read-extended-command-predicate #'command-completion-default-include-p)
   ;; Disable Ispell completion function. As an alternative try `cape-dict'.
   (text-mode-ispell-word-completion nil)
   (tab-always-indent 'complete)
+
+  :bind (:map corfu-map
+              ("TAB" . corfu-next)          ; Next completion
+              ([tab] . corfu-next)
+              ("S-TAB" . corfu-previous)    ; Previous completion
+              ([backtab] . corfu-previous)
+              ("RET" . corfu-insert)        ; Insert completion
+              ([return] . corfu-insert)
+              ("M-d" . corfu-show-documentation)  ; Show documentation
+              ("M-l" . corfu-show-location))      ; Show location
 
   ;; Enable Corfu
   :config
@@ -325,11 +354,11 @@
   :commands (cape-dabbrev cape-file cape-elisp-block)
   :bind ("C-c TAB" . cape-prefix-map)
   :init
-  ;; Add to the global default value of `completion-at-point-functions' which is
-  ;; used by `completion-at-point'.
-  (add-hook 'completion-at-point-functions #'cape-dabbrev)
-  (add-hook 'completion-at-point-functions #'cape-file)
-  (add-hook 'completion-at-point-functions #'cape-elisp-block))
+  ;; Cape completions disabled by default - use only LSP/eglot completions
+  ;; Uncomment below if you want buffer word completions:
+  ;; (add-hook 'completion-at-point-functions #'cape-dabbrev)
+  ;; (add-hook 'completion-at-point-functions #'cape-file)
+  )
 
 
 
@@ -352,6 +381,19 @@
 
 ;; Display the time in the modeline
 (display-time-mode 1)
+
+;; Increase all UI font size by 1 point
+(set-face-attribute 'default nil :height 150)  ; Default text (was ~120)
+
+;; Make active window more obvious with distinct colors
+(set-face-attribute 'mode-line nil
+                    :background "#3a3a3a"
+                    :foreground "#ffffff"
+                    :box '(:line-width 2 :color "#5f87af"))
+(set-face-attribute 'mode-line-inactive nil
+                    :background "#1c1c1c"
+                    :foreground "#808080"
+                    :box '(:line-width 1 :color "#2a2a2a"))
 
 ;; Paren match highlighting
 (show-paren-mode 1)
@@ -392,6 +434,48 @@
 (use-package dockerfile-mode
   :ensure t
   :defer t)
+
+;; Python configuration with LSP
+(use-package python
+  :ensure nil  ; built-in
+  :defer t
+  :hook ((python-mode . eglot-ensure)
+         (python-ts-mode . eglot-ensure))
+  :bind (:map python-mode-map
+              ("M-?" . xref-find-references)     ; Find all references
+              ("C-c C-d" . eldoc-doc-buffer)     ; Show documentation
+              ("C-c ! n" . flymake-goto-next-error)      ; Next error
+              ("C-c ! p" . flymake-goto-prev-error)      ; Previous error
+              ("C-c ! l" . flymake-show-buffer-diagnostics) ; List all errors
+              ("C-c ! e" . flymake-show-diagnostic))     ; Show error at point
+  :config
+  ;; Use Python 3 by default
+  (setq python-shell-interpreter "python3")
+
+  ;; Configure eglot to use pyright (full LSP) + ruff (linting/formatting)
+  (with-eval-after-load 'eglot
+    (add-to-list 'eglot-server-programs
+                 '(python-mode . ("pyright-langserver" "--stdio"))))
+
+  ;; Format buffer before saving with ruff
+  (add-hook 'before-save-hook
+            (lambda ()
+              (when (eq major-mode 'python-mode)
+                (eglot-format-buffer))))
+
+  ;; Add Python navigation to cheat-sheet
+  (with-eval-after-load 'help
+    (add-to-list 'help-quick-sections
+                 '("Python Navigation"
+                   (xref-find-definitions . "M-.: jump to def")
+                   (xref-pop-marker-stack . "M-,: jump back")
+                   (xref-find-references . "M-?: find refs")
+                   (eldoc-doc-buffer . "C-c C-d: show docs")
+                   (eglot-rename . "rename symbol")
+                   (flymake-show-diagnostic . "C-c ! e: show error")
+                   (flymake-goto-next-error . "C-c ! n: next error")
+                   (flymake-goto-prev-error . "C-c ! p: prev error")))))
+
 (use-package go-mode
   :ensure t
   :defer t
@@ -424,7 +508,31 @@
                    (eglot-rename . "rename")
                    (flymake-show-diagnostic . "show error")
                    (flymake-goto-next-error . "next error")
-                   (flymake-goto-prev-error . "prev error")))))
+                   (flymake-goto-prev-error . "prev error")))
+
+    ;; Add Search to cheat-sheet
+    (add-to-list 'help-quick-sections
+                 '("Search & Navigation"
+                   (consult-ripgrep . "M-s r: ripgrep in project")
+                   (consult-line . "M-s l: search current buffer")
+                   (consult-line-multi . "M-s L: search all buffers")
+                   (deadgrep . "M-s g: deadgrep search")
+                   (helm-do-grep-ag . "C-c f: helm grep/ag")
+                   (consult-find . "M-s d: find files")
+                   (dired-jump . "C-c d: jump to dired")
+                   (consult-imenu . "M-g i: jump to symbol")
+                   (consult-goto-line . "M-g g: goto line")
+                   (consult-project-buffer . "C-c p b: project buffers")))
+
+    ;; Add Autocomplete to cheat-sheet
+    (add-to-list 'help-quick-sections
+                 '("Autocomplete (Corfu)"
+                   (completion-at-point . "C-M-i: manual complete")
+                   (corfu-next . "TAB: next completion")
+                   (corfu-previous . "S-TAB: previous completion")
+                   (corfu-insert . "RET: accept completion")
+                   (corfu-show-documentation . "M-d: show docs")
+                   (corfu-show-location . "M-l: show location")))))
 
 ;;   :ensure t
 ;;   :defer t
@@ -472,7 +580,7 @@
 ;;    ("M-e" . dirvish-emerge-menu)
 ;;    ("M-j" . dirvish-fd-jump)))
 
-(global-set-key (kbd "M-s") 'dired-jump)
+(global-set-key (kbd "C-c d") 'dired-jump)  ; Jump to dired (d for dired, left hand friendly)
 (global-set-key (kbd "C-x C-d") 'ibuffer)
 
 
@@ -510,11 +618,36 @@ and for `evil' users, map
 ;;(setq ls-lisp-dirs-first t)
 
 ;;(setq dired-listing-switches "-al --group-directories-first")
+
+;; Set Docker context early (before anything loads)
+(setenv "DOCKER_CONTEXT" "colima-updev-vz")
+(setenv "DOCKER_HOST" "unix:///Users/upwork/.colima/updev-vz/docker.sock")
+
+;; Register TRAMP handlers after minimal-emacs.d restores file-name-handler-alist
+;; minimal-emacs.d restores at depth 101, so we register at 104
+(add-hook 'emacs-startup-hook
+          (lambda ()
+            (require 'tramp)
+            (require 'tramp-container)
+            (tramp-register-file-name-handlers))
+          104)
+
 (with-eval-after-load 'tramp
   (add-to-list 'tramp-remote-path 'tramp-own-remote-path)
-
   (add-to-list 'tramp-remote-path "/opt/homebrew/bin")
   (setq explicit-shell-file-name "/bin/bash")
+
+  ;; Disable version control for remote files (speeds up TRAMP, prevents hangs)
+  (setq vc-ignore-dir-regexp
+        (format "\\(%s\\)\\|\\(%s\\)"
+                vc-ignore-dir-regexp
+                tramp-file-name-regexp))
+
+  ;; Performance and reliability settings for TRAMP
+  (setq tramp-verbose 6)  ; Debug mode (1 = errors only, 6 = debug)
+  (setq tramp-use-ssh-controlmaster-options nil)  ; Can cause issues on macOS
+  (setq remote-file-name-inhibit-cache nil)  ; Enable caching
+
   (add-to-list 'tramp-connection-properties
                (list (regexp-quote "/ssh:upwork@macmini.local:")
                      "remote-shell" "/bin/bash --login")))
@@ -595,11 +728,36 @@ and for `evil' users, map
   ;; Enable true color support
   (setq eat-term-name "xterm-256color"))
 
-(use-package claude-code :ensure t
-  :vc (:url "https://github.com/stevemolitor/claude-code.el" :rev :newest)
-  :config
-  (claude-code-mode)
+(use-package claude-code-ide
+  :ensure t
+  :vc (:url "https://github.com/manzaltu/claude-code-ide.el" :rev :newest)
+  :custom
+  (claude-code-ide-terminal-backend 'vterm)  ; Use vterm terminal (default)
+  (claude-code-ide-vterm-anti-flicker t)  ; Enable anti-flicker optimization
+  (claude-code-ide-side-window-position 'right)  ; Claude on right side
+  :init
   ;; Set environment to force colors in Claude CLI
   (setenv "FORCE_COLOR" "1")
   (setenv "COLORTERM" "truecolor")
-  :bind-keymap ("C-c v" . claude-code-command-map))
+  :config
+  (claude-code-ide-emacs-tools-setup)  ; Setup Emacs tools integration
+
+  ;; Add Claude Code IDE to cheat-sheet
+  (with-eval-after-load 'help
+    (add-to-list 'help-quick-sections
+                 '("Claude Code IDE"
+                   (claude-code-ide . "start Claude")
+                   (claude-code-ide-continue . "continue chat")
+                   (claude-code-ide-resume . "resume previous")
+                   (claude-code-ide-stop . "stop Claude")
+                   (claude-code-ide-switch-to-buffer . "switch to buffer")
+                   (claude-code-ide-list-sessions . "list sessions")
+                   (claude-code-ide-menu . "show menu"))))
+
+  :bind (("C-c v v" . claude-code-ide)              ; Start Claude for project
+         ("C-c v c" . claude-code-ide-continue)     ; Continue recent conversation
+         ("C-c v r" . claude-code-ide-resume)       ; Resume previous conversation
+         ("C-c v s" . claude-code-ide-stop)         ; Stop Claude
+         ("C-c v b" . claude-code-ide-switch-to-buffer)  ; Switch to Claude buffer
+         ("C-c v l" . claude-code-ide-list-sessions)
+         ("C-c C-'" . claude-code-ide-menu)))
