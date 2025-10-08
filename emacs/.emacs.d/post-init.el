@@ -256,12 +256,26 @@
              eglot-ensure
              eglot-rename
              eglot-format-buffer)
+  :custom
+  ;; Enable event logging for debugging (set to 0 to disable)
+  (eglot-events-buffer-size 2000000)
+  ;; Improve completion performance
+  (eglot-sync-connect nil)
+  (eglot-autoshutdown t)
   :config
   ;; Use only eglot completions (no buffer words, etc.)
   (setq completion-category-defaults nil)
-  ;; Improve completion performance
-  (setq eglot-sync-connect nil)
-  (setq eglot-autoshutdown t))
+
+  ;; Configure JSON language server to enable schema validation
+  ;; The server should auto-detect $schema properties in JSON files
+  (setq-default eglot-workspace-configuration
+                '(:json (:validate (:enable t)
+                        :format (:enable t))))
+
+  ;; Note: Eglot has built-in support for vscode-json-languageserver
+  ;; It will try these in order: vscode-json-language-server, vscode-json-languageserver, json-languageserver
+  ;; No custom configuration needed
+  )
 
 
 (use-package easysession
@@ -291,17 +305,18 @@
   (add-hook 'emacs-startup-hook #'easysession-save-mode 103)
 
   :config
-  ;; Auto-create session based on project directory
-  (defun my/easysession-auto-save-on-project-switch ()
-    "Automatically save/load session when switching projects."
-    (when (project-current)
-      (let* ((project-root (project-root (project-current)))
-             (session-name (file-name-nondirectory (directory-file-name project-root))))
-        (easysession-switch-to session-name))))
+  ;; Disabled: Auto-switching sessions on project switch interferes with multiple frames
+  ;; Use C-c l to manually switch sessions if needed
+  ;; (defun my/easysession-auto-save-on-project-switch ()
+  ;;   "Automatically save/load session when switching projects."
+  ;;   (when (project-current)
+  ;;     (let* ((project-root (project-root (project-current)))
+  ;;            (session-name (file-name-nondirectory (directory-file-name project-root))))
+  ;;       (easysession-switch-to session-name))))
 
-  ;; Hook into project switching
-  (advice-add 'project-switch-project :after
-              (lambda (&rest _) (my/easysession-auto-save-on-project-switch))))
+  ;; (advice-add 'project-switch-project :after
+  ;;             (lambda (&rest _) (my/easysession-auto-save-on-project-switch)))
+  )
 
 
 
@@ -391,6 +406,20 @@
                     :foreground "#808080"
                     :box '(:line-width 1 :color "#2a2a2a"))
 
+;; Thicker window dividers for easier mouse grabbing
+(window-divider-mode 1)
+(setq window-divider-default-right-width 4)   ; Thicker right divider
+(setq window-divider-default-bottom-width 4)  ; Thicker bottom divider
+(setq window-divider-default-places 'right-only) ; Show dividers on right side
+;; Darker divider color
+(set-face-attribute 'window-divider nil :foreground "#444444")
+(set-face-attribute 'window-divider-first-pixel nil :foreground "#444444")
+(set-face-attribute 'window-divider-last-pixel nil :foreground "#444444")
+
+;; Highlight current line globally (no underline, just background)
+(global-hl-line-mode 1)
+(set-face-attribute 'hl-line nil :underline nil :background "#2a2a2a")
+
 ;; Paren match highlighting
 (show-paren-mode 1)
 
@@ -471,6 +500,17 @@
                    (flymake-show-diagnostic . "C-c ! e: show error")
                    (flymake-goto-next-error . "C-c ! n: next error")
                    (flymake-goto-prev-error . "C-c ! p: prev error")))))
+
+;; JSON configuration with tree-sitter and LSP
+(use-package json-mode
+  :ensure t
+  :defer t)
+
+;; Prefer json-ts-mode (tree-sitter) for better syntax highlighting
+(add-to-list 'major-mode-remap-alist '(json-mode . json-ts-mode))
+
+;; Enable eglot for JSON
+(add-hook 'json-ts-mode-hook #'eglot-ensure)
 
 (use-package go-mode
   :ensure t
@@ -578,7 +618,6 @@
 
 (global-set-key (kbd "C-c d") 'dired-jump)  ; Jump to dired (d for dired, left hand friendly)
 (global-set-key (kbd "C-x C-d") 'ibuffer)
-
 
 (eval-when-compile (require 'dired))
 ;;;###autoload
