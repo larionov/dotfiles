@@ -386,6 +386,23 @@
 
 
 
+;; Show project directory in window title
+(setq frame-title-format
+      '(:eval
+        (let ((project (project-current)))
+          (if project
+              ;; Show: filename [project-name]
+              (format "%s [%s]"
+                      (if buffer-file-name
+                          (file-name-nondirectory buffer-file-name)
+                        "%b")
+                      (file-name-nondirectory
+                       (directory-file-name (project-root project))))
+            ;; No project: just show buffer name or file path
+            (if buffer-file-name
+                (abbreviate-file-name buffer-file-name)
+              "%b")))))
+
 ;; Hide warnings and display only errors
 (setq warning-minimum-level :error)
 
@@ -533,6 +550,26 @@
                         (when (eq major-mode 'json-ts-mode)
                           (json-pretty-print-buffer)))
                       nil t)))
+
+;; Markdown configuration with GitHub-flavored preview
+(use-package markdown-mode
+  :ensure t
+  :defer t
+  :mode (("\\.md\\'" . gfm-mode)
+         ("\\.markdown\\'" . gfm-mode))
+  :config
+  (setq markdown-command "pandoc -t html5"))
+
+;; grip-mode for GitHub-flavored markdown preview in browser
+(use-package grip-mode
+  :ensure t
+  :defer t
+  :commands grip-mode
+  :custom
+  ;; Use grip from home venv
+  (grip-binary-path (expand-file-name "~/.venv/bin/grip"))
+  :bind (:map markdown-mode-command-map
+              ("g" . grip-mode)))
 
 (use-package go-mode
   :ensure t
@@ -770,7 +807,7 @@ and for `evil' users, map
   :ensure t
   :vc (:url "https://github.com/manzaltu/claude-code-ide.el" :rev :newest)
   :custom
-  (claude-code-ide-terminal-backend 'vterm)  ; Use vterm terminal (default)
+  (claude-code-ide-terminal-backend 'eat)  ; Use vterm terminal (default)
   (claude-code-ide-vterm-anti-flicker t)  ; Enable anti-flicker optimization
   (claude-code-ide-side-window-position 'right)  ; Claude on right side
   :init
