@@ -200,6 +200,10 @@
         xref-show-definitions-function #'consult-xref)
 
   :config
+  ;; Include hidden files and config files in ripgrep searches
+  (setq consult-ripgrep-args
+        (concat consult-ripgrep-args " --hidden --glob=!.git/"))
+
   (consult-customize
    consult-theme :preview-key '(:debounce 0.2 any)
    consult-ripgrep consult-git-grep consult-grep
@@ -386,6 +390,31 @@
 
 
 
+;; Pulsar: Flash/pulse lines to draw attention (especially useful for minibuffer)
+(use-package pulsar
+  :ensure t
+  :config
+  (setq pulsar-pulse t)
+  (setq pulsar-delay 0.055)
+  (setq pulsar-iterations 10)
+  (pulsar-global-mode 1)
+
+  ;; Pulse when minibuffer opens to make prompts more noticeable
+  (add-hook 'minibuffer-setup-hook #'pulsar-pulse-line)
+
+  ;; Recommended hooks for common navigation scenarios
+  (add-hook 'next-error-hook #'pulsar-pulse-line)  ; M-g n/p (flymake, grep, etc.)
+  (add-hook 'imenu-after-jump-hook #'pulsar-pulse-line)  ; M-g i (imenu)
+  (add-hook 'consult-after-jump-hook #'pulsar-pulse-line)  ; consult navigation
+  (add-hook 'xref-after-jump-hook #'pulsar-pulse-line)  ; M-. (go to definition)
+  (add-hook 'xref-after-return-hook #'pulsar-pulse-line)  ; M-, (go back)
+  (add-hook 'isearch-update-post-hook #'pulsar-pulse-line)  ; C-s (search)
+
+  ;; Pulse after window/buffer changes
+  (add-hook 'window-selection-change-functions
+            (lambda (_)
+              (pulsar-pulse-line))))
+
 ;; Show project directory in window title
 (setq frame-title-format
       '(:eval
@@ -463,6 +492,17 @@
 ;; Replace selected text with typed text
 (delete-selection-mode 1)
 
+;; Delete word backward without adding to kill ring
+(defun delete-word-backward ()
+  "Delete word backward without adding to kill ring."
+  (interactive)
+  (delete-region (point) (progn (backward-word) (point))))
+
+;; Rebind M-backspace and C-backspace to delete instead of kill
+(global-set-key (kbd "M-<backspace>") 'delete-word-backward)
+(global-set-key (kbd "M-DEL") 'delete-word-backward)
+(global-set-key (kbd "C-<backspace>") 'delete-word-backward)
+
 ;; Configure Emacs to ask for confirmation before exiting
 (setq confirm-kill-emacs 'y-or-n-p)
 
@@ -489,6 +529,15 @@
 (use-package dockerfile-mode
   :ensure t
   :defer t)
+
+;; YAML configuration
+(use-package yaml-mode
+  :ensure t
+  :defer t
+  :mode (("\\.yml\\'" . yaml-mode)
+         ("\\.yaml\\'" . yaml-mode))
+  :hook (yaml-mode . (lambda ()
+                       (define-key yaml-mode-map "\C-m" 'newline-and-indent))))
 
 ;; Python configuration with LSP
 (use-package python
@@ -759,6 +808,15 @@ and for `evil' users, map
   (dolist (mode '(corfu-mode goggles-mode beacon-mode))
     (add-hook 'macrursors-pre-finish-hook mode)
     (add-hook 'macrursors-post-finish-hook mode))
+
+;; Make macrursors scroll to show newly marked selections
+(defun macrursors-recenter-after-mark (&rest _)
+  "Recenter window after marking to show the selection."
+  (recenter))
+
+(advice-add 'macrursors-mark-next-instance-of :after #'macrursors-recenter-after-mark)
+(advice-add 'macrursors-mark-previous-instance-of :after #'macrursors-recenter-after-mark)
+
 (global-set-key (kbd "C-c SPC") #'macrursors-select)
 (global-set-key (kbd "C->") #'macrursors-mark-next-instance-of)
 (global-set-key (kbd "C-<") #'macrursors-mark-previous-instance-of)
