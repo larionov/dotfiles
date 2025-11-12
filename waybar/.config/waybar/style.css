@@ -352,3 +352,48 @@ label:focus {
 #privacy-item.audio-out {
     background-color: #0069d4;
 }
+
+#bluetooth {
+    background-color: #2472c8;
+    color: #ffffff;
+    padding: 0 10px;
+}
+
+#bluetooth.disabled {
+    background-color: #90b1b1;
+    color: #666666;
+}
+
+#bluetooth.connected {
+    background-color: #0a84ff;
+    color: #ffffff;
+}
+
+#bluetooth:hover {
+    background-color: #1e5fa8;
+}
+
+#custom-bluetooth {
+    background-color: #2472c8;
+    color: #ffffff;
+    padding: 0 10px;
+}
+
+#custom-bluetooth.off {
+    background-color: #90b1b1;
+    color: #666666;
+}
+
+#custom-bluetooth.on {
+    background-color: #2472c8;
+    color: #ffffff;
+}
+
+#custom-bluetooth.connected {
+    background-color: #0a84ff;
+    color: #ffffff;
+}
+
+#custom-bluetooth:hover {
+    background-color: #1e5fa8;
+}

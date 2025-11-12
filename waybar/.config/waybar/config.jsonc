@@ -253,5 +253,28 @@
 			"suspend": "systemctl suspend",
 			"hibernate": "systemctl hibernate"
 		}
+    },
+    "bluetooth": {
+        "format": "BT",
+        "format-disabled": "BT Off",
+        "format-connected": "BT {num_connections}",
+        "format-connected-battery": "BT {device_alias} {device_battery_percentage}%",
+        "tooltip-format": "{controller_alias}\t{controller_address}\n\n{num_connections} connected",
+        "tooltip-format-connected": "{controller_alias}\t{controller_address}\n\n{num_connections} connected\n\n{device_enumerate}",
+        "tooltip-format-enumerate-connected": "{device_alias}\t{device_address}",
+        "tooltip-format-enumerate-connected-battery": "{device_alias}\t{device_address}\t{device_battery_percentage}%",
+        "on-click": "wofi-bluetooth",
+        "on-click-right": "overskride",
+        "on-click-middle": "bluetoothctl power toggle"
+    },
+    "custom/bluetooth": {
+        "format": "{}",
+        "return-type": "json",
+        "exec": "$HOME/.local/bin/bluetooth-status.sh",
+        "interval": 5,
+        "on-click": "wofi-bluetooth",
+        "on-click-right": "overskride",
+        "on-click-middle": "bluetoothctl power toggle && sleep 0.5 && pkill -SIGRTMIN+8 waybar",
+        "tooltip": true
     }
 }

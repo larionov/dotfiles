@@ -31,4 +31,3 @@ PS1='[\u@\h \W]\$ '
 bind 'set show-all-if-ambiguous on' 2>/dev/null
 bind 'TAB:menu-complete' 2>/dev/null
 
-alias claude="/home/larionov/.claude/local/claude"
