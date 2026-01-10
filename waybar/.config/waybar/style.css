@@ -397,3 +397,24 @@ label:focus {
 #custom-bluetooth:hover {
     background-color: #1e5fa8;
 }
+
+#custom-envycontrol {
+    background-color: #76b900;
+    color: #ffffff;
+    padding: 0 10px;
+}
+
+#custom-envycontrol:hover {
+    background-color: #5a8f00;
+}
+
+#custom-power-toggle {
+    padding: 0 10px;
+}
+
+#submap {
+    background-color: #64727D;
+    color: #ffffff;
+    padding: 0 10px;
+    font-weight: bold;
+}

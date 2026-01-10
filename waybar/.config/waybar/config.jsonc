@@ -8,6 +8,7 @@
     // Choose the order of the modules
     "modules-left": [
         "hyprland/workspaces",
+        "hyprland/submap",
         "custom/media"
     ],
     "modules-center": [
@@ -18,6 +19,7 @@
         "idle_inhibitor",
         "pulseaudio",
         "network",
+        "custom/envycontrol",
         "custom/power-toggle",
         "power-profiles-daemon",
         "cpu",
@@ -63,6 +65,13 @@
             "empty": "○",
             "default": "○"
         }
+    },
+    "hyprland/submap": {
+        "format": "{}",
+        "default-submap": "df",
+        "tooltip": true,
+        "tooltip-format": "Click to toggle mode",
+        "on-click": "hyprctl dispatch submap $(hyprctl submap | grep -q df && echo rd || echo df)"
     },
     // "sway/workspaces": {
     //     "disable-scroll": true,
@@ -240,6 +249,15 @@
         "on-click": "$HOME/Sync/dotfiles/bin/power-toggle.sh",
         "interval": 5,
         "tooltip-format": "Click to cycle power profiles\nCurrent: {}",
+        "return-type": ""
+    },
+    "custom/envycontrol": {
+        "format": "{}",
+        "exec": "envycontrol --query 2>/dev/null | sed 's/integrated/🔌 iGPU/; s/hybrid/⚡ Hybrid/; s/nvidia/🎮 NVIDIA/'",
+        "on-click": "$HOME/.local/bin/envycontrol-toggle.sh",
+        "interval": 10,
+        "tooltip": true,
+        "tooltip-format": "GPU Mode: {}\nClick to cycle (reboot required)",
         "return-type": ""
     },
     "custom/power": {

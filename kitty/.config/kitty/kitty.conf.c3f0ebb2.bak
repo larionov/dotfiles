@@ -2787,4 +2787,3 @@ shell fish
 
 #: }}}
 
-map shift+enter send_text all \e\r

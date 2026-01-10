@@ -1,7 +1,16 @@
 ;;; post-init.el --- DESCRIPTION -*- no-byte-compile: t; lexical-binding: t; -*-
 (use-package exec-path-from-shell
   :init
-  (exec-path-from-shell-initialize))
+  ;; Copy API keys from shell environment
+  (when (daemonp)
+    (exec-path-from-shell-copy-env "ANTHROPIC_API_KEY")
+    (exec-path-from-shell-copy-env "OPENAI_FIM_API_KEY")
+    (exec-path-from-shell-copy-env "GEMINI_API_KEY"))
+  (exec-path-from-shell-initialize)
+  ;; Ensure API keys are copied even in non-daemon mode
+  (exec-path-from-shell-copy-env "ANTHROPIC_API_KEY")
+  (exec-path-from-shell-copy-env "OPENAI_FIM_API_KEY")
+  (exec-path-from-shell-copy-env "GEMINI_API_KEY"))
 
 ;; Add Go bin to exec-path
 (add-to-list 'exec-path (expand-file-name "~/go/bin"))
@@ -294,6 +303,22 @@
   ;; No custom configuration needed
   )
 
+;; Configure Tinymist for Typst files
+(with-eval-after-load 'eglot
+  (add-to-list 'eglot-server-programs
+               '(typst-ts-mode . ("tinymist"))))
+
+;; Helper function to auto-install tree-sitter grammars
+(defun my/ensure-treesit-grammar (language url)
+  "Ensure tree-sitter grammar for LANGUAGE is installed from URL."
+  (when (and (fboundp 'treesit-available-p)
+             (treesit-available-p)
+             (boundp 'treesit-language-source-alist))
+    (add-to-list 'treesit-language-source-alist (list language url))
+    (unless (treesit-language-available-p language)
+      (message "Installing tree-sitter grammar for %s..." language)
+      (treesit-install-language-grammar language))))
+
 
 (use-package easysession
   :ensure t
@@ -387,6 +412,7 @@
   ;; (add-hook 'completion-at-point-functions #'cape-dabbrev)
   ;; (add-hook 'completion-at-point-functions #'cape-file)
   )
+
 
 
 
@@ -581,6 +607,9 @@
                    (flymake-goto-prev-error . "C-c ! p: prev error")))))
 
 ;; JSON configuration with tree-sitter and LSP
+;; Auto-install JSON tree-sitter grammar
+(my/ensure-treesit-grammar 'json "https://github.com/tree-sitter/tree-sitter-json")
+
 (use-package json-mode
   :ensure t
   :defer t)
@@ -727,36 +756,36 @@
 (global-set-key (kbd "C-c d") 'dired-jump)  ; Jump to dired (d for dired, left hand friendly)
 (global-set-key (kbd "C-x C-d") 'ibuffer)
 
-(eval-when-compile (require 'dired))
-;;;###autoload
-(defun dired-find-parent-directory ()
-  "Open a `dired'-buffer of the parent directory."
+;; Dired arrow navigation - uses built-ins with position memory
+(defvar dired--nav-history (make-hash-table :test 'equal)
+  "Tracks cursor position per directory for arrow navigation.")
+
+(defun dired-arrow-up ()
+  "Go up to parent. Remembers position for `dired-arrow-down'."
   (interactive)
-  (find-alternate-file ".."))
+  (let ((file (dired-get-filename nil t)))
+    (when file
+      (puthash (dired-current-directory) file dired--nav-history))
+    (dired-up-directory)))
 
-;;;###autoload
-(defun dired-arrow-keys-install ()
-  "Install `dired-arrow-keys' by modifying `dired-mode-map'.
-
-Map
-
-    <right> to `dired-find-file'
-    <left> to `dired-find-parent-directory'
-
-and for `evil' users, map
-
-    \\[evil-forward-char] to `dired-find-file'
-    \\[evil-backward-char] to `dired-find-parent-directory'"
+(defun dired-arrow-down ()
+  "Enter directory, restore previous position if available."
   (interactive)
-  (define-key dired-mode-map (kbd "<right>") 'dired-find-file)
-  (define-key dired-mode-map (kbd "<left>") 'dired-find-parent-directory)
-  (eval-after-load 'evil
-    '(progn
-       (define-key dired-mode-map (vector 'remap 'evil-forward-char) 'dired-find-file)
-       (define-key dired-mode-map (vector 'remap 'evil-backward-char) 'dired-find-parent-directory))))
+  (let* ((target (dired-get-file-for-visit))
+         (target-dir (and (file-directory-p target)
+                          (file-name-as-directory target)))
+         (saved (gethash target-dir dired--nav-history)))
+    (dired-find-file)
+    (when (and saved (eq major-mode 'dired-mode))
+      (dired-goto-file saved))))
 
-
-(dired-arrow-keys-install)
+(with-eval-after-load 'dired
+  (define-key dired-mode-map (kbd "<left>") 'dired-arrow-up)
+  (define-key dired-mode-map (kbd "<right>") 'dired-arrow-down)
+  (with-eval-after-load 'evil
+    (evil-define-key 'normal dired-mode-map
+      (kbd "h") 'dired-arrow-up
+      (kbd "l") 'dired-arrow-down)))
 
 ;;(setq ls-lisp-dirs-first t)
 
@@ -800,6 +829,282 @@ and for `evil' users, map
   )
 
 (use-package go-mode :ensure t :defer t)
+
+;; Zig configuration with LSP (Zig 0.15 compatible)
+(use-package zig-mode
+  :ensure t
+  :defer t
+  :hook ((zig-mode . eglot-ensure))
+  :bind (:map zig-mode-map
+              ("M-?" . xref-find-references)     ; Find all references
+              ("C-c C-d" . eldoc-doc-buffer)     ; Show documentation
+              ("C-c ! n" . flymake-goto-next-error)      ; Next error
+              ("C-c ! p" . flymake-goto-prev-error)      ; Previous error
+              ("C-c ! l" . flymake-show-buffer-diagnostics) ; List all errors
+              ("C-c ! e" . flymake-show-diagnostic)      ; Show error at point
+              ("C-c C-c" . zig-compile)          ; Compile
+              ("C-c C-r" . zig-run)              ; Run
+              ("C-c C-t" . zig-test-buffer))     ; Test
+  :config
+  ;; Format buffer before saving with zig fmt
+  (add-hook 'before-save-hook
+            (lambda ()
+              (when (eq major-mode 'zig-mode)
+                (eglot-format-buffer))))
+
+  ;; Configure eglot to use ZLS (Zig Language Server)
+  (with-eval-after-load 'eglot
+    (add-to-list 'eglot-server-programs
+                 '(zig-mode . ("zls"))))
+
+  ;; Add Zig navigation to cheat-sheet
+  (with-eval-after-load 'help
+    (add-to-list 'help-quick-sections
+                 '("Zig Navigation"
+                   (xref-find-definitions . "M-.: jump to def")
+                   (xref-pop-marker-stack . "M-,: jump back")
+                   (xref-find-references . "M-?: find refs")
+                   (eldoc-doc-buffer . "C-c C-d: show docs")
+                   (eglot-rename . "rename symbol")
+                   (flymake-show-diagnostic . "C-c ! e: show error")
+                   (flymake-goto-next-error . "C-c ! n: next error")
+                   (flymake-goto-prev-error . "C-c ! p: prev error")
+                   (zig-compile . "C-c C-c: compile")
+                   (zig-run . "C-c C-r: run")
+                   (zig-test-buffer . "C-c C-t: test")))))
+
+;; JavaScript/TypeScript configuration with typescript-language-server
+(use-package typescript-mode
+  :ensure t
+  :defer t
+  :mode (("\\.ts\\'" . typescript-mode)
+         ("\\.tsx\\'" . typescript-mode))
+  :hook ((typescript-mode . eglot-ensure))
+  :bind (:map typescript-mode-map
+              ("M-?" . xref-find-references)
+              ("C-c C-d" . eldoc-doc-buffer)
+              ("C-c ! n" . flymake-goto-next-error)
+              ("C-c ! p" . flymake-goto-prev-error)
+              ("C-c ! l" . flymake-show-buffer-diagnostics)
+              ("C-c ! e" . flymake-show-diagnostic))
+  :config
+  ;; Auto-format on save
+  (add-hook 'before-save-hook
+            (lambda ()
+              (when (eq major-mode 'typescript-mode)
+                (eglot-format-buffer)))))
+
+(use-package js-mode
+  :ensure nil  ; built-in
+  :defer t
+  :mode (("\\.js\\'" . js-mode)
+         ("\\.jsx\\'" . js-mode)
+         ("\\.mjs\\'" . js-mode))
+  :hook ((js-mode . eglot-ensure))
+  :bind (:map js-mode-map
+              ("M-?" . xref-find-references)
+              ("C-c C-d" . eldoc-doc-buffer)
+              ("C-c ! n" . flymake-goto-next-error)
+              ("C-c ! p" . flymake-goto-prev-error)
+              ("C-c ! l" . flymake-show-buffer-diagnostics)
+              ("C-c ! e" . flymake-show-diagnostic))
+  :config
+  ;; Auto-format on save
+  (add-hook 'before-save-hook
+            (lambda ()
+              (when (eq major-mode 'js-mode)
+                (eglot-format-buffer)))))
+
+;; Configure eglot to use typescript-language-server for JS/TS
+(with-eval-after-load 'eglot
+  (add-to-list 'eglot-server-programs
+               '((js-mode typescript-mode) . ("typescript-language-server" "--stdio"))))
+
+;; Babashka/Clojure configuration with clj-kondo (via clojure-lsp)
+(use-package clojure-mode
+  :ensure t
+  :defer t
+  :mode (("\\.clj\\'" . clojure-mode)
+         ("\\.cljs\\'" . clojurescript-mode)
+         ("\\.cljc\\'" . clojurec-mode)
+         ("\\.edn\\'" . clojure-mode)
+         ("\\.bb\\'" . clojure-mode)      ; Babashka scripts
+         ("bb\\.edn\\'" . clojure-mode))  ; Babashka config
+  :hook ((clojure-mode . eglot-ensure)
+         (clojurescript-mode . eglot-ensure)
+         (clojurec-mode . eglot-ensure))
+  :bind (:map clojure-mode-map
+              ("M-?" . xref-find-references)     ; Find all references
+              ("C-c C-d" . eldoc-doc-buffer)     ; Show documentation
+              ("C-c ! n" . flymake-goto-next-error)      ; Next error
+              ("C-c ! p" . flymake-goto-prev-error)      ; Previous error
+              ("C-c ! l" . flymake-show-buffer-diagnostics) ; List all errors
+              ("C-c ! e" . flymake-show-diagnostic))     ; Show error at point
+  :config
+  (setq clojure-indent-style 'align-arguments
+        clojure-align-forms-automatically t)
+
+  ;; Fix completion for namespace-qualified symbols (str/, set/, etc.)
+  ;; Make sure '/' is treated as part of the symbol for completion
+  (add-hook 'clojure-mode-hook
+            (lambda ()
+              ;; Ensure corfu continues completion after typing '/'
+              (setq-local completion-at-point-functions
+                          (append '(eglot-completion-at-point)
+                                  completion-at-point-functions))
+              ;; Don't treat '/' as a word boundary
+              (modify-syntax-entry ?/ "_" clojure-mode-syntax-table)
+              ;; Don't let Corfu quit when typing '/'
+              (setq-local corfu-quit-at-boundary nil)
+              ;; Continue showing completions after typing '/'
+              (setq-local corfu-auto-prefix 1)))
+
+  ;; Configure eglot to use clojure-lsp (which includes clj-kondo)
+  (with-eval-after-load 'eglot
+    (add-to-list 'eglot-server-programs
+                 '((clojure-mode clojurescript-mode clojurec-mode) . ("clojure-lsp")))))
+
+(use-package cider
+  :ensure t
+  :defer t
+  :commands (cider cider-jack-in cider-jack-in-clj cider-jack-in-cljs)
+  :hook ((clojure-mode . cider-mode)
+         (clojurescript-mode . cider-mode)
+         (clojurec-mode . cider-mode))
+  :bind (:map cider-mode-map
+              ("C-c C-e" . cider-eval-last-sexp)  ; Eval last expression
+              ("C-c C-k" . cider-load-buffer)     ; Load buffer
+              ("C-c C-z" . cider-switch-to-repl-buffer))  ; Switch to REPL
+  :custom
+  ;; Auto-detect build tool (deps.edn, bb.edn, or project.clj)
+  ;; CIDER will automatically choose the right tool for each project
+
+  ;; REPL configuration
+  (cider-repl-display-help-banner nil)
+  (cider-repl-pop-to-buffer-on-connect nil)
+  (cider-repl-use-pretty-printing t)
+
+  ;; Eldoc (inline documentation)
+  (cider-eldoc-display-for-symbol-at-point t)
+
+  ;; Auto-completion
+  (cider-completion-annotations-include-ns t)
+
+  :config
+  ;; Configure CIDER to recognize Babashka projects
+  (setq cider-jack-in-default 'clojure-cli)
+  (add-to-list 'cider-jack-in-dependencies '("babashka/babashka" "latest"))
+
+  ;; Helper function to start Babashka REPL
+  (defun cider-jack-in-babashka ()
+    "Start a Babashka nREPL server and connect CIDER to it."
+    (interactive)
+    (let* ((project-dir (or (locate-dominating-file default-directory "bb.edn")
+                            default-directory))
+           (default-directory project-dir)
+           (port "1667"))
+      ;; Start Babashka nREPL server in background
+      (message "Starting Babashka nREPL server on port %s..." port)
+      (start-process "babashka-nrepl" "*babashka-nrepl*"
+                     "bb" "--nrepl-server" port)
+      ;; Wait a moment for server to start, then connect
+      (run-with-timer 2 nil
+                      (lambda ()
+                        (cider-connect-clj (list :host "localhost" :port port))
+                        (message "Connected to Babashka REPL at localhost:%s" port)))))
+
+  ;; Auto-connect to Babashka REPL when opening .bb files in bb.edn projects
+  (defun my-babashka-auto-connect ()
+    "Auto-connect to Babashka REPL if in a bb.edn project and not already connected."
+    (when (and (or (derived-mode-p 'clojure-mode)
+                   (string-suffix-p ".bb" (buffer-file-name)))
+               (locate-dominating-file default-directory "bb.edn")
+               (not (cider-connected-p)))
+      (cider-jack-in-babashka)))
+
+  ;; Enable auto-connect when opening Clojure/Babashka files
+  (add-hook 'clojure-mode-hook #'my-babashka-auto-connect)
+
+  ;; Add keybinding for Babashka REPL
+  (define-key clojure-mode-map (kbd "C-c M-b") 'cider-jack-in-babashka)
+
+  ;; Add to cheat-sheet
+  (with-eval-after-load 'help
+    (add-to-list 'help-quick-sections
+                 '("Clojure/Babashka"
+                   (xref-find-definitions . "M-.: jump to def")
+                   (xref-pop-marker-stack . "M-,: jump back")
+                   (xref-find-references . "M-?: find refs")
+                   (eldoc-doc-buffer . "C-c C-d: show docs (LSP)")
+                   (flymake-show-diagnostic . "C-c ! e: show error (clj-kondo)")
+                   (flymake-goto-next-error . "C-c ! n: next error")
+                   (flymake-goto-prev-error . "C-c ! p: prev error")
+                   (cider-jack-in . "C-c M-j: start REPL")
+                   (cider-jack-in-babashka . "C-c M-b: connect to Babashka REPL")
+                   (cider-eval-last-sexp . "C-c C-e: eval expression")
+                   (cider-load-buffer . "C-c C-k: load buffer")
+                   (cider-switch-to-repl-buffer . "C-c C-z: switch to REPL")))))
+
+;; Typst configuration with tree-sitter and Tinymist LSP
+;; Auto-install Typst tree-sitter grammar
+(my/ensure-treesit-grammar 'typst "https://github.com/uben0/tree-sitter-typst")
+
+(use-package typst-ts-mode
+  :ensure t
+  :vc (:url "https://codeberg.org/meow_king/typst-ts-mode" :rev :newest)
+  :defer t
+  :mode "\\.typ\\'"
+  :hook ((typst-ts-mode . eglot-ensure))
+  :bind (:map typst-ts-mode-map
+              ("M-?" . xref-find-references)     ; Find all references
+              ("C-c C-d" . eldoc-doc-buffer)     ; Show documentation
+              ("C-c ! n" . flymake-goto-next-error)      ; Next error
+              ("C-c ! p" . flymake-goto-prev-error)      ; Previous error
+              ("C-c ! l" . flymake-show-buffer-diagnostics) ; List all errors
+              ("C-c ! e" . flymake-show-diagnostic))     ; Show error at point
+  :config
+  (setq typst-ts-mode-watch-options "--open")
+
+  ;; Add Typst navigation to cheat-sheet
+  (with-eval-after-load 'help
+    (add-to-list 'help-quick-sections
+                 '("Typst Navigation"
+                   (xref-find-definitions . "M-.: jump to def")
+                   (xref-pop-marker-stack . "M-,: jump back")
+                   (xref-find-references . "M-?: find refs")
+                   (eldoc-doc-buffer . "C-c C-d: show docs")
+                   (eglot-rename . "rename symbol")
+                   (flymake-show-diagnostic . "C-c ! e: show error")
+                   (flymake-goto-next-error . "C-c ! n: next error")
+                   (flymake-goto-prev-error . "C-c ! p: prev error")
+                   (typst-preview-mode . "C-c C-v: toggle preview")
+                   (typst-preview-send-position . "C-c C-j: jump to preview")))))
+
+;; Typst Preview - Live preview in browser
+(use-package websocket
+  :ensure t
+  :defer t)
+
+(use-package typst-preview
+  :ensure t
+  :vc (:url "https://github.com/havarddj/typst-preview.el" :rev :newest)
+  :defer t
+  :commands (typst-preview-mode
+             typst-preview-start
+             typst-preview-stop
+             typst-preview-restart
+             typst-preview-send-position)
+  :bind (:map typst-ts-mode-map
+              ("C-c C-v" . typst-preview-mode)        ; Toggle preview
+              ("C-c C-j" . typst-preview-send-position)) ; Jump to preview position
+  :custom
+  (typst-preview-executable "tinymist")
+  (typst-preview-browser "default")  ; Use system default browser
+  (typst-preview-partial-rendering t)
+  (typst-preview-invert-colors "auto")
+  :init
+  (setq typst-preview-autostart nil)  ; Manual start with C-c C-v
+  (setq typst-preview-open-browser-automatically t))
 
 (add-to-list 'load-path "~/.emacs.d/packages/macrursors")
 (require 'macrursors)
@@ -894,3 +1199,27 @@ and for `evil' users, map
          ("C-c v b" . claude-code-ide-switch-to-buffer)  ; Switch to Claude buffer
          ("C-c v l" . claude-code-ide-list-sessions)
          ("C-c C-'" . claude-code-ide-menu)))
+
+;; Agent Shell - Interface for interacting with LLM agents via ACP
+(use-package agent-shell
+  :ensure t
+  :defer t
+  :commands (agent-shell)
+  :config
+  ;; Configure Auggie agent
+  (setq agent-shell-agents
+        '((auggie
+           :command ("auggie" "acp")
+           :model "claude-sonnet-4"
+           :env-file nil  ; Set to path if you have .env file
+           :env nil)))  ; Add environment variables if needed
+
+  ;; Add Agent Shell to cheat-sheet
+  (with-eval-after-load 'help
+    (add-to-list 'help-quick-sections
+                 '("Agent Shell (Auggie)"
+                   (agent-shell . "C-c a a: start agent")
+                   (agent-shell-send . "send message")
+                   (agent-shell-interrupt . "interrupt agent"))))
+
+  :bind (("C-c a a" . agent-shell)))

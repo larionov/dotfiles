@@ -16,10 +16,13 @@ else
     alias ls='ls --color=auto'
     # Configure sudo askpass
     export SUDO_ASKPASS="$HOME/.local/bin/sudo-askpass"
+    # Fix OpenSSL 3.6.0 compatibility with AUR
+    export OPENSSL_CONF=/dev/null
 fi
 
 # Common configuration
 PATH="$HOME/.local/bin:$PATH"
+PATH="$HOME/.claude/local:$PATH"
 if [[ -f "$HOME/.local/bin/env" ]]; then
     . "$HOME/.local/bin/env"
 fi
