@@ -3,3 +3,5 @@ emacs/**/.git/
 emacs/.emacs.d/packages
 .git
 .DS_Store
+*.sync-conflict-*
+*.bak

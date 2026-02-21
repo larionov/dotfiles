@@ -1,0 +1,11 @@
+[Unit]
+Description=GSConnect CLI
+After=graphical-session.target
+PartOf=default.target
+
+[Service]
+ExecStart=/usr/share/gnome-shell/extensions/gsconnect@andyholmes.github.io/service/daemon.js
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

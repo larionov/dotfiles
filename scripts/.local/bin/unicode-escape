@@ -1,0 +1,70 @@
+#!/usr/bin/env python3
+"""Convert non-ASCII characters in files to/from \\uXXXX JSON escape sequences.
+
+Usage:
+    unicode-escape encode <file>   # non-ASCII -> \\uXXXX (in-place)
+    unicode-escape decode <file>   # \\uXXXX -> actual characters (in-place)
+    unicode-escape encode < input  # stdin/stdout mode
+    unicode-escape decode < input  # stdin/stdout mode
+"""
+
+import sys
+import re
+
+
+def encode(text):
+    """Replace non-ASCII characters with \\uXXXX escape sequences."""
+    result = []
+    for ch in text:
+        cp = ord(ch)
+        if cp > 127:
+            if cp <= 0xFFFF:
+                result.append(f"\\u{cp:04x}")
+            else:
+                # Surrogate pair for supplementary plane characters
+                cp -= 0x10000
+                high = 0xD800 + (cp >> 10)
+                low = 0xDC00 + (cp & 0x3FF)
+                result.append(f"\\u{high:04x}\\u{low:04x}")
+        else:
+            result.append(ch)
+    return "".join(result)
+
+
+def decode(text):
+    """Replace \\uXXXX escape sequences with actual Unicode characters."""
+    # Handle surrogate pairs first
+    text = re.sub(
+        r"\\u([dD][89aAbB][0-9a-fA-F]{2})\\u([dD][cCdDeEfF][0-9a-fA-F]{2})",
+        lambda m: chr(
+            0x10000
+            + ((int(m.group(1), 16) - 0xD800) << 10)
+            + (int(m.group(2), 16) - 0xDC00)
+        ),
+        text,
+    )
+    # Then single escapes
+    text = re.sub(r"\\u([0-9a-fA-F]{4})", lambda m: chr(int(m.group(1), 16)), text)
+    return text
+
+
+def main():
+    if len(sys.argv) < 2 or sys.argv[1] not in ("encode", "decode"):
+        print(__doc__, file=sys.stderr)
+        sys.exit(1)
+
+    action = encode if sys.argv[1] == "encode" else decode
+
+    if len(sys.argv) >= 3:
+        path = sys.argv[2]
+        with open(path, "r") as f:
+            text = f.read()
+        result = action(text)
+        with open(path, "w") as f:
+            f.write(result)
+    else:
+        sys.stdout.write(action(sys.stdin.read()))
+
+
+if __name__ == "__main__":
+    main()

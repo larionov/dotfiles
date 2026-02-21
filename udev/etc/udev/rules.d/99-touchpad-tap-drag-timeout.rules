@@ -3,3 +3,8 @@
 ACTION=="add|change", KERNEL=="event*", \
   ATTRS{name}=="ELAN0676:00 04F3:3195 Touchpad", \
   ENV{LIBINPUT_ATTR_TAPPING_DRAG_ENABLED}="0"
+
+# Disable touchpad tap-and-drag for Synaptics touchpad
+ACTION=="add|change", KERNEL=="event*", \
+  ATTRS{name}=="SYNA8018:00 06CB:CE67 Touchpad", \
+  ENV{LIBINPUT_ATTR_TAPPING_DRAG_ENABLED}="0"

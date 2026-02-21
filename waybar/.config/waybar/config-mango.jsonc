@@ -1,0 +1,198 @@
+// -*- mode: jsonc -*-
+{
+    "layer": "top", // Waybar at top layer
+    // "position": "bottom", // Waybar position (top|bottom|left|right)
+    // "width": 1280, // Waybar width
+    "spacing": 4, // Gaps between modules (4px)
+    // Choose the order of the modules
+    "modules-left": [
+        "ext/workspaces",
+        "wlr/taskbar",
+        "dwl/window"
+    ],
+    "modules-center": [
+    ],
+    "modules-right": [
+        "tray",
+        "network",
+        "custom/gsconnect",
+        "custom/gpu-selector",
+        "cpu",
+        "memory",
+        "temperature",
+        "pulseaudio",
+        "backlight",
+        "group/battery-power",
+        "clock",
+        "custom/power"
+    ],
+    "dwl/window": {
+        "format": "[{layout}]{title}",
+        "on-click":"bash ~/.config/mango/scripts/screenshot.sh",
+        "tooltip-format": "{title}",
+        // "max-length": 50
+    },
+    "ext/workspaces": {
+      "format": "{name}",
+      "ignore-hidden": true,
+      // "active-only":true,
+      "on-click": "activate",
+      "on-click-right": "deactivate",
+      "on-scroll-up":"mmsg -d viewtoleft_have_client",
+      "on-scroll-down":"mmsg -d viewtoright_have_client",
+      "sort-by-id": true,
+       "format-icons": {
+         "1": "\uf120",
+         "2": "\uf268",
+         "3": "\uf121",
+         "4": "\uf1bc",
+         "5": "\uf075",
+         "urgent": "\uf06a",
+         "active": "\uf192",
+         "default": "\uf111"
+      },
+    },
+    "wlr/taskbar": {
+      "format": "{icon}",
+      "icon-size": 20,
+      "all-outputs": false,
+      "tooltip-format": "{title}",
+      "markup": true,
+      "on-click": "activate",
+      "on-click-right": "close",
+      "ignore-list": ["Rofi", "wofi"]
+    },
+    "network": {
+      "interval": 2,
+      "format-wifi": "{essid} ({signalStrength}%) \uf1eb ",
+      "format-ethernet": "\udb80\ude00 {ifname}",
+      "format-linked": "\uf059 No IP ({ifname})",
+      "format-disconnected": "\uf071 Disconnected",
+      "tooltip-format": "{ifname} {ipaddr}/{cidr} via {gwaddr}",
+      "format-alt": "\u2193{bandwidthDownBytes} \u2191{bandwidthUpBytes}"
+    },
+    "custom/gsconnect": {
+      "format": "{}",
+      "exec": "~/.local/bin/gsconnect-status",
+      "interval": 30,
+      "exec-if": "pgrep -f 'gsconnect.*daemon.js'",
+      "on-click": "/usr/share/gnome-shell/extensions/gsconnect@andyholmes.github.io/gsconnect-preferences",
+      "tooltip": true,
+      "tooltip-format": "GSConnect connected devices"
+    },
+
+    "tray": {
+        "icon-size": 21,
+        "spacing": 10
+    },
+    "clock": {
+      "format": "\uf017 {:%H:%M}",
+      "format-alt": "\ueab0 {:L%A, %b %d}",
+      "tooltip-format": "{:%Y}",
+    },
+    "cpu": {
+      "interval": 2,
+      "format": "\uf2db {load}%"
+    },
+    "memory": {
+        "format": "\uf0c9 {}%"
+    },
+    "temperature": {
+        // "thermal-zone": 2,
+        // "hwmon-path": "/sys/class/hwmon/hwmon2/temp1_input",
+        "critical-threshold": 90,
+        // "format-critical": "{temperatureF}\u00b0F {icon}",
+        "format": "{icon} {temperatureC}\u00b0C",
+        "tooltip": true,
+        "tooltip-format": "{temperatureF}\u00b0F",
+        "format-icons": ["\uf2cb", "\uf2c9", "\uf2c7"]
+    },
+    "backlight": {
+        // "device": "acpi_video1",
+        "format": "{icon} {percent}%",
+        "format-icons": ["\udb81\udd94", "\udb81\udda8"],
+    },
+    "group/battery-power": {
+        "orientation": "horizontal",
+        "modules": ["battery", "custom/power-toggle"]
+    },
+    "battery": {
+        "states": {
+            // "good": 95,
+            "warning": 30,
+            "critical": 15
+        },
+        "format": "{capacity}% {icon}",
+        "format-full": "{capacity}% {icon}",
+        "format-charging": "{capacity}% \uf1e6",
+        "format-plugged": "{capacity}% \uf1e6",
+        "format-alt": "{time} {icon}",
+        // "format-good": "", // An empty format will hide the module
+        // "format-full": "",
+        "format-icons": ["\uf244", "\uf243", "\uf242", "\uf241", "\uf240"]
+    },
+    "battery#bat2": {
+        "bat": "BAT2"
+    },
+    "pulseaudio": {
+        "format": "{icon} {volume}%",
+        "tooltip": false,
+        "format-muted": "\uf026 Muted",
+        "on-click": "pamixer -t",
+        "on-scroll-up": "pamixer -i 2",
+        "on-scroll-down": "pamixer -d 2",
+        "scroll-step": 5,
+        "format-icons": {
+            "headphone": "\uf025",
+            "hands-free": "\uf025",
+            "headset": "\uf025",
+            "phone": "\uf095",
+            "portable": "\uf095",
+            "car": "\uf1b9",
+            "default": ["\uf026", "\uf027", "\uf028"]
+        }
+    },
+    "custom/gpu-selector": {
+        "format": "\uf108  {}",
+        "exec": "envycontrol --query",
+        "interval": 300,
+        "on-click": "$HOME/.local/bin/envycontrol-toggle.sh",
+        "tooltip": true,
+        "tooltip-format": "Click to toggle GPU mode"
+    },
+    "custom/power-toggle": {
+        "format": "{}",
+        "exec": "powerprofilesctl get | sed 's/power-saver/\ud83d\udd0b/; s/balanced/\u2696\ufe0f/; s/performance/\ud83d\ude80/'",
+        "on-click": "$HOME/.local/bin/power-toggle.sh",
+        "interval": 5,
+        "tooltip": true,
+        "tooltip-format": "Click to cycle power profiles"
+    },
+    "custom/power": {
+        "format": "\udb82\udcc7",
+        "tooltip": false,
+        "on-click": "wlogout -C ~/.config/mango/wlogout/style.css -l  ~/.config/mango/wlogout/layout  -b 6 --protocol layer-shell",
+        "on-click-right": "sleep 0.1s && swaync-client -t -sw",
+
+    },
+    "custom/notification": {
+      "tooltip": false,
+      "format": "{icon}",
+      "format-icons": {
+        "notification": "\uf0a2<span foreground='red'><sup>\uf444</sup></span>",
+        "none": " \uf0a2 ",
+        "dnd-notification": "\uf1f7<span foreground='red'><sup>\uf444</sup></span>",
+        "dnd-none": "\uf1f7",
+        "inhibited-notification": "\uf0a2<span foreground='red'><sup>\uf444</sup></span>",
+        "inhibited-none": "\uf0a2",
+        "dnd-inhibited-notification": "\uf1f7<span foreground='red'><sup>\uf444</sup></span>",
+        "dnd-inhibited-none": "\uf1f7"
+      },
+      "return-type": "json",
+      "exec-if": "which swaync-client",
+      "exec": "swaync-client -swb",
+      "on-click": "sleep 0.1s && swaync-client -t -sw",
+      "on-click-right": "swaync-client -d -sw",
+      "escape": true
+    },
+}

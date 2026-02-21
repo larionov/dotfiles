@@ -109,6 +109,18 @@ check_dependencies() {
         missing_packages+=("wget")
     fi
     
+    if ! command -v fish >/dev/null 2>&1; then
+        missing_packages+=("fish")
+    fi
+
+    if ! command -v micro >/dev/null 2>&1; then
+        missing_packages+=("micro")
+    fi
+
+    if ! command -v kitty >/dev/null 2>&1; then
+        missing_packages+=("kitty")
+    fi
+
     if ! command -v rg >/dev/null 2>&1; then
         missing_packages+=("ripgrep")
     fi
@@ -138,6 +150,15 @@ check_dependencies() {
             if ! command -v hyprlock >/dev/null 2>&1; then
                 missing_packages+=("hyprlock")
             fi
+            if ! command -v waybar >/dev/null 2>&1; then
+                missing_packages+=("waybar")
+            fi
+            if ! command -v playerctl >/dev/null 2>&1; then
+                missing_packages+=("playerctl")
+            fi
+            if ! command -v brightnessctl >/dev/null 2>&1; then
+                missing_packages+=("brightnessctl")
+            fi
 
             if ! command -v io.elementary.settings > /dev/null 2>&1; then
                 missing_packages+=("switchboard")
@@ -156,10 +177,33 @@ check_dependencies() {
             fi
             ;;
     esac
-    
+
     if [[ ${#missing_packages[@]} -gt 0 ]]; then
-        install_packages "${missing_packages[@]}"
-        print_info "✓ Dependencies installed"
+        if install_packages "${missing_packages[@]}"; then
+            print_info "✓ Dependencies installed"
+        else
+            print_warning "Some dependencies failed to install: ${missing_packages[*]}"
+            print_warning "You may need to install them manually"
+        fi
+    fi
+
+    # Install AUR packages (Arch Linux only)
+    if [[ "$os" == "linux/arch" ]] && command -v paru >/dev/null 2>&1; then
+        local aur_packages=()
+
+        # MangoWC compositor
+        if ! command -v mango >/dev/null 2>&1; then
+            aur_packages+=("mangowc-git")
+        fi
+
+        if [[ ${#aur_packages[@]} -gt 0 ]]; then
+            print_info "Installing AUR packages: ${aur_packages[*]}"
+            if paru -S --noconfirm "${aur_packages[@]}"; then
+                print_info "✓ AUR packages installed"
+            else
+                print_warning "Some AUR packages failed to install: ${aur_packages[*]}"
+            fi
+        fi
     fi
 }
 
@@ -231,6 +275,43 @@ install_fonts() {
         rm -rf "$temp_dir"
     fi
     
+    # Install Maple Mono NF CN
+    if ! fc-list | grep -i "maple mono nf cn" > /dev/null 2>&1; then
+        local installed_maple=false
+
+        # Try AUR on Arch Linux
+        if [[ "$os" == "linux/arch" ]] && command -v paru >/dev/null 2>&1; then
+            print_info "Installing Maple Mono NF CN from AUR..."
+            paru -S --noconfirm maplemono-nf-cn
+            installed_maple=true
+        fi
+
+        # Fallback: download from GitHub releases
+        if [[ "$installed_maple" == "false" ]]; then
+            print_info "Installing Maple Mono NF CN from GitHub..."
+            local temp_dir=$(mktemp -d)
+            local maple_url="https://github.com/subframe7536/maple-font/releases/download/v7.9/MapleMono-NF-CN.zip"
+
+            if command -v wget >/dev/null 2>&1; then
+                wget -O "$temp_dir/maple-nf-cn.zip" "$maple_url"
+            else
+                curl -L -o "$temp_dir/maple-nf-cn.zip" "$maple_url"
+            fi
+
+            unzip -q "$temp_dir/maple-nf-cn.zip" -d "$temp_dir"
+            cp "$temp_dir"/*.ttf "$fonts_dir/" 2>/dev/null || true
+
+            if [[ "$os" != "macos" ]]; then
+                fc-cache -fv
+            fi
+            rm -rf "$temp_dir"
+        fi
+
+        print_info "✓ Maple Mono NF CN installed"
+    else
+        print_debug "✓ Maple Mono NF CN already installed"
+    fi
+
     # Install JetBrains Mono Nerd Font for Linux
     if [[ "$os" != "macos" ]] && ! fc-list | grep -i "jetbrainsmono nerd font" > /dev/null 2>&1; then
         print_info "Installing JetBrains Mono Nerd Font..."
@@ -331,12 +412,12 @@ stow_packages() {
     cd "$DOTFILES_DIR"
     
     # Universal packages
-    packages+=("bash" "kitty" "scripts")
-    
+    packages+=("bash" "fish" "kitty" "scripts" "fontconfig" "micro")
+
     # Platform-specific packages
     case "$os" in
         "linux/arch")
-            packages+=("hyprland" "waybar" "dunst" "hyprlock")
+            packages+=("hyprland" "waybar" "dunst" "hyprlock" "mangowc")
             # Machine-specific packages
             local machine_id=""
             if [[ -f /etc/machine-id ]]; then
@@ -351,32 +432,47 @@ stow_packages() {
             # macOS-specific packages would go here
             ;;
     esac
-    
+
     # Always install emacs last (after base is set up)
     packages+=("emacs")
     
     print_info "Installing packages with Stow: ${packages[*]}"
     
+    local failed_packages=()
+
     for package in "${packages[@]}"; do
         if [[ -d "$package" ]]; then
             if [[ "$package" == "udev" ]]; then
                 print_info "Installing $package with sudo (requires root access for /etc)..."
-                sudo stow -v -t / "$package"
-                print_info "✓ $package stowed to root filesystem"
-                # Reload udev rules
-                print_info "Reloading udev rules..."
-                sudo udevadm control --reload-rules
-                sudo udevadm trigger --subsystem-match=input
-                print_info "✓ udev rules reloaded"
+                if sudo stow -v -t / "$package"; then
+                    print_info "✓ $package stowed to root filesystem"
+                    # Reload udev rules
+                    print_info "Reloading udev rules..."
+                    sudo udevadm control --reload-rules
+                    sudo udevadm trigger --subsystem-match=input
+                    print_info "✓ udev rules reloaded"
+                else
+                    print_warning "Failed to stow $package (conflicts?), skipping"
+                    failed_packages+=("$package")
+                fi
             else
                 print_info "Stowing $package..."
-                stow -v -t ~ "$package"
-                print_info "✓ $package stowed"
+                if stow -v -t ~ "$package"; then
+                    print_info "✓ $package stowed"
+                else
+                    print_warning "Failed to stow $package (conflicts?), skipping"
+                    failed_packages+=("$package")
+                fi
             fi
         else
             print_warning "Package directory $package not found, skipping"
         fi
     done
+
+    if [[ ${#failed_packages[@]} -gt 0 ]]; then
+        print_warning "The following packages failed to stow: ${failed_packages[*]}"
+        print_warning "Try resolving conflicts manually, then run: $0 restow"
+    fi
 }
 
 # Unstow packages (for uninstall)
@@ -387,12 +483,12 @@ unstow_packages() {
     cd "$DOTFILES_DIR"
     
     # Universal packages
-    packages+=("bash" "kitty" "scripts" "emacs")
-    
+    packages+=("bash" "fish" "kitty" "scripts" "fontconfig" "micro" "emacs")
+
     # Platform-specific packages
     case "$os" in
         "linux/arch")
-            packages+=("hyprland" "waybar" "dunst" "hyprlock")
+            packages+=("hyprland" "waybar" "dunst" "hyprlock" "mangowc")
             # Machine-specific packages
             local machine_id=""
             if [[ -f /etc/machine-id ]]; then
@@ -404,19 +500,25 @@ unstow_packages() {
             fi
             ;;
     esac
-    
+
     print_info "Removing packages with Stow: ${packages[*]}"
     
     for package in "${packages[@]}"; do
         if [[ -d "$package" ]]; then
             if [[ "$package" == "udev" ]]; then
                 print_info "Removing $package with sudo..."
-                sudo stow -D -v -t / "$package"
-                print_info "✓ $package unstowed from root filesystem"
+                if sudo stow -D -v -t / "$package"; then
+                    print_info "✓ $package unstowed from root filesystem"
+                else
+                    print_warning "Failed to unstow $package, skipping"
+                fi
             else
                 print_info "Unstowing $package..."
-                stow -D -v -t ~ "$package"
-                print_info "✓ $package unstowed"
+                if stow -D -v -t ~ "$package"; then
+                    print_info "✓ $package unstowed"
+                else
+                    print_warning "Failed to unstow $package, skipping"
+                fi
             fi
         fi
     done
@@ -500,13 +602,13 @@ main() {
         "linux/arch")
             # Enable hyprpolkitagent systemd service
             if command -v hyprpolkitagent >/dev/null 2>&1; then
-                systemctl --user enable hyprpolkitagent.service
-                systemctl --user start hyprpolkitagent.service
+                systemctl --user enable hyprpolkitagent.service || print_warning "Failed to enable hyprpolkitagent service"
+                systemctl --user start hyprpolkitagent.service || print_warning "Failed to start hyprpolkitagent service"
                 print_info "✓ hyprpolkitagent service enabled"
             fi
             print_info "Reload Hyprland with: hyprctl reload"
 
-            XDG_MENU_PREFIX=arch- kbuildsycoca6
+            XDG_MENU_PREFIX=arch- kbuildsycoca6 || print_warning "kbuildsycoca6 failed"
             ;;
         
         "macos")

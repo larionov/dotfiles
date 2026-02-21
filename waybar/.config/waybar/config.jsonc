@@ -236,17 +236,16 @@
         "return-type": "json",
         "max-length": 40,
         "format-icons": {
-            "spotify": "",
+            "spotify": "",
             "default": "🎜"
         },
         "escape": true,
-        "exec": "$HOME/.config/waybar/mediaplayer.py 2> /dev/null" // Script in resources folder
-        // "exec": "$HOME/.config/waybar/mediaplayer.py --player spotify 2> /dev/null" // Filter player based on name
+        "exec": "playerctl -a metadata --format '{\"text\": \"{{artist}} - {{markup_escape(title)}}\", \"tooltip\": \"{{playerName}} : {{markup_escape(title)}}\", \"alt\": \"{{status}}\", \"class\": \"{{status}}\"}' -F 2> /dev/null"
     },
     "custom/power-toggle": {
         "format": "{}",
         "exec": "powerprofilesctl get | sed 's/power-saver/🔋/; s/balanced/⚖️/; s/performance/🚀/'",
-        "on-click": "$HOME/Sync/dotfiles/bin/power-toggle.sh",
+        "on-click": "$HOME/.local/bin/power-toggle.sh",
         "interval": 5,
         "tooltip-format": "Click to cycle power profiles\nCurrent: {}",
         "return-type": ""

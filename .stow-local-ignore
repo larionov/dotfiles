@@ -12,6 +12,7 @@ install\.sh
 .*\.bak
 .*\.tmp
 .*\.log
+.*sync-conflict.*
 
 # OS-specific files
 \.DS_Store

@@ -79,11 +79,17 @@
 
 (use-package savehist
   :init
-  (savehist-mode))
+  (savehist-mode)
+  :config
+  (setq history-length 10000
+	    history-delete-duplicates nil
+	    savehist-save-minibuffer-history t)
+  )
 
 (use-package deadgrep
   :ensure t
   :defer t
+  
     :bind (("M-s g" . deadgrep))
     )
 
@@ -121,7 +127,10 @@
   :bind
   (("C-." . embark-act)         ;; pick some comfortable binding
    ("C-;" . embark-dwim)        ;; good alternative: M-.
-   ("C-h B" . embark-bindings)) ;; alternative for `describe-bindings'
+   ("C-h B" . embark-bindings)  ;; alternative for `describe-bindings'
+   :map minibuffer-local-map
+   ("C-c C-e" . embark-export)  ;; export to editable buffer
+   ("C-c C-l" . embark-collect))
 
   :init
   (setq prefix-help-command #'embark-prefix-help-command)
@@ -217,9 +226,6 @@
    consult-theme :preview-key '(:debounce 0.2 any)
    consult-ripgrep consult-git-grep consult-grep
    consult-bookmark consult-recent-file consult-xref
-   consult--source-bookmark consult--source-file-register
-   consult--source-recent-file consult--source-project-recent-file
-   ;; :preview-key "M-."
    :preview-key '(:debounce 0.4 any))
   (setq consult-narrow-key "<"))
 
@@ -241,25 +247,6 @@
 
   :custom
   (outline-indent-ellipsis " ▼ "))
-
-
-(use-package outline-indent
-  :ensure t
-  :defer t
-  :commands outline-indent-minor-mode
-
-  :init
-  ;; The minor mode can also be automatically activated for a certain modes.
-  ;; For example for Python and YAML:
-  (add-hook 'python-mode-hook #'outline-indent-minor-mode)
-  (add-hook 'python-ts-mode-hook #'outline-indent-minor-mode)
-
-  (add-hook 'yaml-mode-hook #'outline-indent-minor-mode)
-  (add-hook 'yaml-ts-mode-hook #'outline-indent-minor-mode)
-
-  :custom
-  (outline-indent-ellipsis " ▼ "))
-
 
 ;; yasnippet - Required for LSP completion with snippet support (e.g., JSON LSP)
 (use-package yasnippet
@@ -311,9 +298,8 @@
 ;; Helper function to auto-install tree-sitter grammars
 (defun my/ensure-treesit-grammar (language url)
   "Ensure tree-sitter grammar for LANGUAGE is installed from URL."
-  (when (and (fboundp 'treesit-available-p)
-             (treesit-available-p)
-             (boundp 'treesit-language-source-alist))
+  (require 'treesit)
+  (when (treesit-available-p)
     (add-to-list 'treesit-language-source-alist (list language url))
     (unless (treesit-language-available-p language)
       (message "Installing tree-sitter grammar for %s..." language)
@@ -524,13 +510,24 @@
   (interactive)
   (delete-region (point) (progn (backward-word) (point))))
 
+;; Keybindings
 ;; Rebind M-backspace and C-backspace to delete instead of kill
 (global-set-key (kbd "M-<backspace>") 'delete-word-backward)
 (global-set-key (kbd "M-DEL") 'delete-word-backward)
 (global-set-key (kbd "C-<backspace>") 'delete-word-backward)
 
-;; Configure Emacs to ask for confirmation before exiting
-(setq confirm-kill-emacs 'y-or-n-p)
+(global-set-key (kbd "C-c d") 'dired-jump)  ; Jump to dired (d for dired, left hand friendly)
+(global-set-key (kbd "C-x C-d") 'ibuffer)
+(global-set-key (kbd "C-c SPC") #'macrursors-select)
+(global-set-key (kbd "C->") #'macrursors-mark-next-instance-of)
+(global-set-key (kbd "C-<") #'macrursors-mark-previous-instance-of)
+(global-set-key (kbd "C-;") 'macrursors-mark-map)
+
+(global-set-key (kbd "C-a")
+		(defun back-to-indentation-or-beginning () (interactive)
+		       (if (= (point) (progn (back-to-indentation) (point)))
+			       (beginning-of-line))))
+;; / keybindings
 
 (use-package uniquify
   :ensure nil
@@ -753,8 +750,6 @@
 ;;    ("M-e" . dirvish-emerge-menu)
 ;;    ("M-j" . dirvish-fd-jump)))
 
-(global-set-key (kbd "C-c d") 'dired-jump)  ; Jump to dired (d for dired, left hand friendly)
-(global-set-key (kbd "C-x C-d") 'ibuffer)
 
 ;; Dired arrow navigation - uses built-ins with position memory
 (defvar dired--nav-history (make-hash-table :test 'equal)
@@ -827,8 +822,6 @@
   (advice-add 'move-text-down :after 'indent-region-advice)
   (advice-add 'move-text-up :after 'indent-region-advice)
   )
-
-(use-package go-mode :ensure t :defer t)
 
 ;; Zig configuration with LSP (Zig 0.15 compatible)
 (use-package zig-mode
@@ -1122,10 +1115,7 @@
 (advice-add 'macrursors-mark-next-instance-of :after #'macrursors-recenter-after-mark)
 (advice-add 'macrursors-mark-previous-instance-of :after #'macrursors-recenter-after-mark)
 
-(global-set-key (kbd "C-c SPC") #'macrursors-select)
-(global-set-key (kbd "C->") #'macrursors-mark-next-instance-of)
-(global-set-key (kbd "C-<") #'macrursors-mark-previous-instance-of)
-(global-set-key (kbd "C-;") 'macrursors-mark-map)
+
 (define-key macrursors-mark-map (kbd "C-;") #'macrursors-mark-all-lines-or-instances)
 (define-key macrursors-mark-map (kbd ";") #'macrursors-mark-all-lines-or-instances)
 (define-key macrursors-mark-map (kbd "l") #'macrursors-mark-all-lists)
@@ -1166,60 +1156,50 @@
   ;; Enable true color support
   (setq eat-term-name "xterm-256color"))
 
-(use-package claude-code-ide
-  :ensure t
-  :vc (:url "https://github.com/manzaltu/claude-code-ide.el" :rev :newest)
-  :custom
-  (claude-code-ide-terminal-backend 'eat)  ; Use vterm terminal (default)
-  (claude-code-ide-vterm-anti-flicker t)  ; Enable anti-flicker optimization
-  (claude-code-ide-side-window-position 'right)  ; Claude on right side
-  :init
-  ;; Set environment to force colors in Claude CLI
-  (setenv "FORCE_COLOR" "1")
-  (setenv "COLORTERM" "truecolor")
+(use-package gptel
+  :vc (:url "https://github.com/karthink/gptel" :rev :newest)
+  :defer t
   :config
-  (claude-code-ide-emacs-tools-setup)  ; Setup Emacs tools integration
+  ;; Show reasoning/thinking content:
+  ;;   t       - inline with response (default)
+  ;;   nil     - hide thinking
+  ;;   'ignore - show but don't send back to model
+  ;;   "*thinking*" - redirect to separate buffer
+  (setq gptel-include-reasoning t)
 
-  ;; Add Claude Code IDE to cheat-sheet
-  (with-eval-after-load 'help
-    (add-to-list 'help-quick-sections
-                 '("Claude Code IDE"
-                   (claude-code-ide . "start Claude")
-                   (claude-code-ide-continue . "continue chat")
-                   (claude-code-ide-resume . "resume previous")
-                   (claude-code-ide-stop . "stop Claude")
-                   (claude-code-ide-switch-to-buffer . "switch to buffer")
-                   (claude-code-ide-list-sessions . "list sessions")
-                   (claude-code-ide-menu . "show menu"))))
+  (setq gptel-model 'qwen3-coder:30b
+        gptel-backend (gptel-make-ollama "Ollama"
+                        :host "192.168.1.107:11434"
+                        :stream t
+                        :models '(qwen3-coder:30b
+                                  gemma3:12b
+                                  deepseek-r1:14b
+                                  deepseek-r1:8b
+                                  codellama:13b-code-q4_K_M
+                                  llama3.2:latest
+                                  llama3.2:1b)))) 
 
-  :bind (("C-c v v" . claude-code-ide)              ; Start Claude for project
-         ("C-c v c" . claude-code-ide-continue)     ; Continue recent conversation
-         ("C-c v r" . claude-code-ide-resume)       ; Resume previous conversation
-         ("C-c v s" . claude-code-ide-stop)         ; Stop Claude
-         ("C-c v b" . claude-code-ide-switch-to-buffer)  ; Switch to Claude buffer
-         ("C-c v l" . claude-code-ide-list-sessions)
-         ("C-c C-'" . claude-code-ide-menu)))
+(use-package gptel-agent
+  :vc (:url "https://github.com/karthink/gptel-agent" :rev :newest)
+  :after gptel
+  :config (gptel-agent-update))
 
-;; Agent Shell - Interface for interacting with LLM agents via ACP
-(use-package agent-shell
+;; Denote - Simple, file-name based note-taking
+(use-package denote
   :ensure t
   :defer t
-  :commands (agent-shell)
+  :bind (("C-c n n" . denote)
+         ("C-c n o" . denote-open-or-create)
+         ("C-c n l" . denote-link)
+         ("C-c n b" . denote-backlinks)
+         ("C-c n r" . denote-rename-file))
+  :custom
+  (denote-directory (expand-file-name "~/Sync/notes/"))
+  (denote-known-keywords '("emacs" "project" "idea" "reference"))
+  (denote-file-type 'org))
+
+(use-package consult-denote
+  :ensure t
+  :after denote
   :config
-  ;; Configure Auggie agent
-  (setq agent-shell-agents
-        '((auggie
-           :command ("auggie" "acp")
-           :model "claude-sonnet-4"
-           :env-file nil  ; Set to path if you have .env file
-           :env nil)))  ; Add environment variables if needed
-
-  ;; Add Agent Shell to cheat-sheet
-  (with-eval-after-load 'help
-    (add-to-list 'help-quick-sections
-                 '("Agent Shell (Auggie)"
-                   (agent-shell . "C-c a a: start agent")
-                   (agent-shell-send . "send message")
-                   (agent-shell-interrupt . "interrupt agent"))))
-
-  :bind (("C-c a a" . agent-shell)))
+  (consult-denote-mode 1))

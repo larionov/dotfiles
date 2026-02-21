@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# GSConnect status script for waybar using gdbus
+
+output=$(gdbus call --session \
+    --dest org.gnome.Shell.Extensions.GSConnect \
+    --object-path /org/gnome/Shell/Extensions/GSConnect \
+    --method org.freedesktop.DBus.ObjectManager.GetManagedObjects 2>/dev/null)
+
+if [ -z "$output" ] || [ "$output" = "()" ]; then
+    echo ""
+    exit 0
+fi
+
+# Extract device paths
+devices=$(echo "$output" | grep -oE "/org/gnome/Shell/Extensions/GSConnect/Device/[^' ]+" | head -5)
+
+for dev in $devices; do
+    connected=$(gdbus call --session \
+        --dest org.gnome.Shell.Extensions.GSConnect \
+        --object-path "$dev" \
+        --method org.freedesktop.DBus.Properties.Get \
+        org.gnome.Shell.Extensions.GSConnect.Device Connected 2>/dev/null)
+
+    if echo "$connected" | grep -q "true"; then
+        name=$(gdbus call --session \
+            --dest org.gnome.Shell.Extensions.GSConnect \
+            --object-path "$dev" \
+            --method org.freedesktop.DBus.Properties.Get \
+            org.gnome.Shell.Extensions.GSConnect.Device Name 2>/dev/null)
+        name=$(echo "$name" | sed "s/.*'\([^']*\)'.*/\1/")
+
+        battery=$(gdbus call --session \
+            --dest org.gnome.Shell.Extensions.GSConnect \
+            --object-path "$dev" \
+            --method org.freedesktop.DBus.Properties.Get \
+            org.gnome.Shell.Extensions.GSConnect.Device Battery 2>/dev/null)
+        battery=$(echo "$battery" | grep -oE "[0-9]+" | head -1)
+
+        device_type=$(gdbus call --session \
+            --dest org.gnome.Shell.Extensions.GSConnect \
+            --object-path "$dev" \
+            --method org.freedesktop.DBus.Properties.Get \
+            org.gnome.Shell.Extensions.GSConnect.Device Type 2>/dev/null)
+
+        # Type returned as string: phone, tablet, computer, tv, headphones
+        case "$device_type" in
+            *phone*) icon=$(printf '\uf3cd') ;;
+            *tablet*) icon=$(printf '\uf3cd') ;;
+            *computer*) icon=$(printf '\uf108') ;;
+            *tv*) icon=$(printf '\uf1c4') ;;
+            *headphones*) icon=$(printf '\uf025') ;;
+            *) icon=$(printf '\uf2dd') ;;
+        esac
+
+        if [ -n "$battery" ]; then
+            printf "%s %s: %s%%\n" "$icon" "$name" "$battery"
+        else
+            printf "%s %s\n" "$icon" "$name"
+        fi
+        exit 0
+    fi
+done
+
+echo ""

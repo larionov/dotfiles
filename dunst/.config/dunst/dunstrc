@@ -42,15 +42,15 @@
     icon_position = left
     min_icon_size = 0
     max_icon_size = 32
-    icon_path = /usr/share/icons/gnome/16x16/status/:/usr/share/icons/gnome/16x16/devices/
+    icon_path = /usr/share/icons/hicolor/16x16/status/:/usr/share/icons/hicolor/16x16/devices/:/usr/share/icons/Adwaita/16x16/status/
 
     # History
     sticky_history = yes
     history_length = 20
 
     # Misc/Advanced
-    dmenu = dmenu -p dunst:
-    browser = /usr/bin/firefox -new-tab
+    dmenu = wofi --dmenu -p dunst:
+    browser = xdg-open
     always_run_script = true
     title = Dunst
     class = Dunst
