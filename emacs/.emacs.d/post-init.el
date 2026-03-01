@@ -333,6 +333,8 @@
   (add-hook 'emacs-startup-hook #'easysession-save-mode 103)
 
   :config
+  (setq confirm-kill-emacs 'y-or-n-p)
+
   ;; Disabled: Auto-switching sessions on project switch interferes with multiple frames
   ;; Use C-c l to manually switch sessions if needed
   ;; (defun my/easysession-auto-save-on-project-switch ()
@@ -766,11 +768,12 @@
 (defun dired-arrow-down ()
   "Enter directory, restore previous position if available."
   (interactive)
-  (let* ((target (dired-get-file-for-visit))
-         (target-dir (and (file-directory-p target)
+  (let* ((target (ignore-errors (dired-get-file-for-visit)))
+         (target-dir (and target
+                          (file-directory-p target)
                           (file-name-as-directory target)))
-         (saved (gethash target-dir dired--nav-history)))
-    (dired-find-file)
+         (saved (and target-dir (gethash target-dir dired--nav-history))))
+    (ignore-errors (dired-find-file))
     (when (and saved (eq major-mode 'dired-mode))
       (dired-goto-file saved))))
 

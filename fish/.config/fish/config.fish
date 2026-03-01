@@ -7,3 +7,5 @@ set -x OPENSSL_CONF /dev/null
 
 # Add ~/.local/bin to PATH
 fish_add_path ~/.local/bin
+
+eval "$(/opt/homebrew/bin/brew shellenv)"
