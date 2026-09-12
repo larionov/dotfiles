@@ -1,0 +1,5 @@
+# Native helpers are compiled per-machine (see helpers/makefile)
+helpers/*/bin/
+helpers/**/bin/
+*.o
+debug.log

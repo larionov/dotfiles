@@ -1,0 +1,60 @@
+# Maintainer: DreamMaoMao <maoopzopaasnmakslpo@gmail.com>
+# Local patch: add WLR_MODIFIER_MOD5 (ralt/altgr) support
+
+pkgname=mangowc-git
+pkgver=r1360.6cc7d16
+pkgrel=2
+pkgdesc="A Wayland compositor with smooth animation"
+url="https://github.com/DreamMaoMao/mangowc"
+arch=("x86_64")
+license=("GPL-3.0")
+depends=(
+  glibc
+  'wayland>=1.23.1'
+  'libinput>=1.27.1'
+  libdrm
+  pixman
+  libxkbcommon
+  pcre2
+  libxcb
+  xorg-xwayland
+  'libwlroots-0.19.so'
+  'scenefx0.4'
+)
+
+makedepends=(
+  git
+  meson
+  ninja
+  'wayland-protocols>=1.41'
+)
+
+provides=(mangowc wayland-compositor)
+conflicts=(mangowc mangowc-wlonly-git)
+source=(
+  "$pkgname::git+https://github.com/DreamMaoMao/mangowc.git"
+  "mod5-ralt.patch"
+)
+md5sums=('SKIP' 'SKIP')
+options=('!strip' '!lto')
+
+
+pkgver() {
+  cd "$pkgname"
+  printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+
+prepare() {
+  cd "$pkgname"
+  patch -p1 < "$srcdir/mod5-ralt.patch"
+}
+
+build() {
+  export CC="gcc"
+  arch-meson $pkgname build
+  ninja -C build
+}
+
+package() {
+  DESTDIR="$pkgdir/" ninja -C build install
+}

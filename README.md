@@ -189,3 +189,29 @@ This system follows the Unix philosophy of "do one thing well":
 - **Version control** tracks all configurations
 
 Clean, simple, and maintainable.
+## macOS (yabai + SketchyBar + skhd)
+
+macOS-only stow packages, applied automatically by `install.sh` on macOS
+(the `macos)` case in `stow_packages`):
+
+- `yabai/`      — tiling WM config (`.config/yabai/yabairc`)
+- `skhd/`       — hotkeys: `⌘1–0` focus space, `⌘⌥1–0` move window
+- `sketchybar/` — Lua/SbarLua bar (binbinsh-based), spaces driven by yabai
+
+`install.sh` also runs `setup_macos_bar`: installs brew deps + Nerd/SF fonts,
+builds SbarLua and the native helpers, fixes the rc shebang, and starts the
+services. Compiled helper binaries (`sketchybar/.config/sketchybar/helpers/*/bin/`)
+are gitignored and rebuilt per machine.
+
+## Nix (all systems)
+
+Minimal flake (`flake.nix`) with per-system `devShells`/`packages` for
+`aarch64-darwin`, `x86_64-darwin`, `x86_64-linux`, `aarch64-linux`:
+
+```bash
+nix develop        # common CLI toolchain (git, stow, ripgrep, fd, fzf, jq, ...)
+nix fmt            # format nix files
+```
+
+macOS/Linux extras are guarded via `pkgs.stdenv.isDarwin` / `isLinux`. The WM
+tools (yabai/skhd/sketchybar) stay on brew + stow, not nix.

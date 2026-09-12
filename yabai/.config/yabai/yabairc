@@ -1,0 +1,44 @@
+yabai -m signal --add event=dock_did_restart action="sudo yabai --load-sa" 
+sudo yabai --load-sa 
+yabai -m config layout bsp
+yabai -m config external_bar all:30:0
+yabai -m config mouse_modifier cmd
+yabai -m config window_shadow float
+
+yabai -m config window_opacity on 
+yabai -m config active_window_opacity 1.0
+yabai -m config normal_window_opacity 0.9
+
+yabai -m config mouse_follows_focus on
+
+# --- float by default (manage=off) ---
+yabai -m rule --add app="^System Settings$"     manage=off
+yabai -m rule --add app="^Calculator$"          manage=off
+yabai -m rule --add app="^Archive Utility$"     manage=off
+yabai -m rule --add app="^Font Book$"           manage=off
+yabai -m rule --add app="^Activity Monitor$"    manage=off
+yabai -m rule --add app="^Disk Utility$"        manage=off
+yabai -m rule --add app="^Karabiner-Elements$"  manage=off
+yabai -m rule --add app="^Software Update$"     manage=off
+yabai -m rule --add app="^App Store$"           manage=off
+yabai -m rule --add app="^Music$"               manage=off
+yabai -m rule --add app="^1Password$"           manage=off
+yabai -m rule --add app="^KeePassXC$"           manage=off
+yabai -m rule --add app="^Finder$" title="^(Copy|Move|Info|Finder Preferences)$" manage=off
+# title-based dialog floats (catch stray popups across all apps)
+yabai -m rule --add title="^(Preferences|Settings|About)$" manage=off
+
+# --- app -> space assignment (matches spaces_names.lua) ---
+yabai -m rule --add app="^Linear$"        space=1
+yabai -m rule --add app="^Emacs$"         space=2
+yabai -m rule --add app="^Supacode$"      space=3
+yabai -m rule --add app="^Google Chrome$" space=4
+yabai -m rule --add app="^Slack$"         space=5
+yabai -m rule --add app="^Claude$"        space=6
+
+# --- sketchybar integration (yabai layout icon + window changes) ---
+# Space-switch highlighting is driven synchronously by the skhd cmd+N binds,
+# so no async space_changed/display_changed signal is needed (removed).
+yabai -m signal --add event=window_focused   action="/opt/homebrew/bin/sketchybar --trigger update_yabai_icon" label="sb_window_focused"
+yabai -m signal --add event=window_created   action="/opt/homebrew/bin/sketchybar --trigger space_windows_change --trigger update_yabai_icon" label="sb_window_created"
+yabai -m signal --add event=window_destroyed action="/opt/homebrew/bin/sketchybar --trigger space_windows_change --trigger update_yabai_icon" label="sb_window_destroyed"

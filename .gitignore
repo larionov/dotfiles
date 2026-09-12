@@ -5,3 +5,20 @@ emacs/.emacs.d/packages
 .DS_Store
 *.sync-conflict-*
 *.bak
+
+# Nix build outputs
+result
+result-*
+
+# Syncthing internals
+.stfolder/
+.stversions/
+
+# Python bytecode cache
+__pycache__/
+*.pyc
+
+# Editor and tool backups
+*.backup.*
+*.ude-backup
+*.dmsbackup*

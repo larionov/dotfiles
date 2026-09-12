@@ -1,0 +1,11 @@
+{
+    "id": "keymodeIndicator",
+    "name": "Keymode Indicator",
+    "description": "Shows a VM badge in the bar when MangoWM VM passthrough mode is active (SUPER+' to toggle). Click to toggle the mode.",
+    "version": "1.0.0",
+    "author": "larionov",
+    "type": "widget",
+    "capabilities": ["dankbar-widget"],
+    "component": "./KeymodeWidget.qml",
+    "icon": "keyboard_hide"
+}

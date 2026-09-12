@@ -22,7 +22,6 @@ fi
 
 # Common configuration
 PATH="$HOME/.local/bin:$PATH"
-PATH="$HOME/.claude/local:$PATH"
 if [[ -f "$HOME/.local/bin/env" ]]; then
     . "$HOME/.local/bin/env"
 fi
@@ -38,3 +37,18 @@ export PATH="$HOME/.npm-global/bin:$PATH"
 
 # opencode
 export PATH="$HOME/.opencode/bin:$PATH"
+
+#export NVM_DIR="$HOME/.nvm"
+#[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+#[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+
+# direnv: load ~/.envrc and per-project env
+eval "$(direnv hook bash)"
+
+
+# Added by Antigravity CLI installer
+export PATH="/Users/upwork/.local/bin:$PATH"
+
+# Upwork corporate CA — NODE_EXTRA_CA_CERTS supplements Node's CA store (no replacement).
+# NOTE: intentionally NOT SSL_CERT_FILE — that replaces the OpenSSL store and would break public CAs.
+export NODE_EXTRA_CA_CERTS="$HOME/.config/upwork/certs/upwork-ca-bundle.pem"

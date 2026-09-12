@@ -1,0 +1,14 @@
+require("items.calendar")
+require("items.volume")
+require("items.battery")
+require("items.wifi")
+require("items.system_stats")
+require("items.weather")
+require("items.pomodoro")
+require("items.spaces")
+require("items.1password")
+require("items.warp")
+require("items.apple")
+-- require("items.menus")  -- disabled: was cloning the native macOS menu bar
+                          -- (File/Edit/...) inside the bar. Native menu now
+                          -- shows on hover at the top edge instead.

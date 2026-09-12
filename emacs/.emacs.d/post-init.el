@@ -296,11 +296,13 @@
                '(typst-ts-mode . ("tinymist"))))
 
 ;; Helper function to auto-install tree-sitter grammars
-(defun my/ensure-treesit-grammar (language url)
+(defun my/ensure-treesit-grammar (language url &optional branch source-dir)
   "Ensure tree-sitter grammar for LANGUAGE is installed from URL."
   (require 'treesit)
   (when (treesit-available-p)
-    (add-to-list 'treesit-language-source-alist (list language url))
+    (add-to-list 'treesit-language-source-alist
+                 (if branch (list language url branch source-dir)
+                   (list language url)))
     (unless (treesit-language-available-p language)
       (message "Installing tree-sitter grammar for %s..." language)
       (treesit-install-language-grammar language))))
@@ -916,6 +918,31 @@
   (add-to-list 'eglot-server-programs
                '((js-mode typescript-mode) . ("typescript-language-server" "--stdio"))))
 
+;; Vue.js configuration with tree-sitter and Volar LSP
+(my/ensure-treesit-grammar 'typescript "https://github.com/tree-sitter/tree-sitter-typescript" "master" "typescript/src")
+(my/ensure-treesit-grammar 'tsx "https://github.com/tree-sitter/tree-sitter-typescript" "master" "tsx/src")
+(my/ensure-treesit-grammar 'css "https://github.com/tree-sitter/tree-sitter-css")
+(my/ensure-treesit-grammar 'vue "https://github.com/ikatyang/tree-sitter-vue")
+(add-to-list 'load-path "~/.emacs.d/packages/vue-ts-mode")
+(require 'vue-ts-mode)
+
+(defun vue-eglot-init-options ()
+  "Return init options for vue-language-server."
+  (let ((tsdk-path (expand-file-name
+                    "lib"
+                    (string-trim-right
+                     (shell-command-to-string
+                      "npm list --global --parseable typescript | head -n1")))))
+    `(:typescript (:tsdk ,tsdk-path)
+      :vue (:hybridMode :json-false))))
+
+(with-eval-after-load 'eglot
+  (add-to-list 'eglot-server-programs
+               `(vue-ts-mode . ("vue-language-server" "--stdio"
+                                :initializationOptions ,(vue-eglot-init-options)))))
+
+(add-hook 'vue-ts-mode-hook #'eglot-ensure)
+
 ;; Babashka/Clojure configuration with clj-kondo (via clojure-lsp)
 (use-package clojure-mode
   :ensure t
@@ -1159,33 +1186,6 @@
   ;; Enable true color support
   (setq eat-term-name "xterm-256color"))
 
-(use-package gptel
-  :vc (:url "https://github.com/karthink/gptel" :rev :newest)
-  :defer t
-  :config
-  ;; Show reasoning/thinking content:
-  ;;   t       - inline with response (default)
-  ;;   nil     - hide thinking
-  ;;   'ignore - show but don't send back to model
-  ;;   "*thinking*" - redirect to separate buffer
-  (setq gptel-include-reasoning t)
-
-  (setq gptel-model 'qwen3-coder:30b
-        gptel-backend (gptel-make-ollama "Ollama"
-                        :host "192.168.1.107:11434"
-                        :stream t
-                        :models '(qwen3-coder:30b
-                                  gemma3:12b
-                                  deepseek-r1:14b
-                                  deepseek-r1:8b
-                                  codellama:13b-code-q4_K_M
-                                  llama3.2:latest
-                                  llama3.2:1b)))) 
-
-(use-package gptel-agent
-  :vc (:url "https://github.com/karthink/gptel-agent" :rev :newest)
-  :after gptel
-  :config (gptel-agent-update))
 
 ;; Denote - Simple, file-name based note-taking
 (use-package denote
@@ -1206,3 +1206,25 @@
   :after denote
   :config
   (consult-denote-mode 1))
+
+(use-package dired-preview
+  :ensure t
+  :config (setq dired-preview-delay 0.0)
+  (setq dired-preview-max-size (expt 2 20))
+  (setq dired-preview-ignored-extensions-regexp
+        (concat "\\."
+                "\\(gz\\|"
+                "zst\\|"
+                "tar\\|"
+                "xz\\|"
+                "rar\\|"
+                "zip\\|"
+                "iso\\|"
+                "epub"
+                "\\)"))
+
+  ;; Enable `dired-preview-mode' in a given Dired buffer or do it
+  ;; globally:
+  (dired-preview-global-mode 1)
+  )
+

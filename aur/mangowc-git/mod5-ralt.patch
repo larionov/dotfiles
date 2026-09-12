@@ -1,0 +1,27 @@
+--- a/src/config/parse_config.h
++++ b/src/config/parse_config.h
+@@ -643,9 +643,11 @@
+ 					mod |= WLR_MODIFIER_SHIFT;
+ 					break;
+ 				case 64:
+-				case 108:
+ 					mod |= WLR_MODIFIER_ALT;
+ 					break;
++				case 108:
++					mod |= WLR_MODIFIER_MOD5;
++					break;
+ 				default:
+ 					fprintf(stderr,
+ 							"unknown modifier keycode: \033[1m\033[31m%s\n",
+@@ -680,6 +682,11 @@
+ 				mod |= WLR_MODIFIER_MOD3;
+ 				match_success = true;
+ 			}
++			if (!strcmp(token, "ralt") || !strcmp(token, "altgr") ||
++				!strcmp(token, "mod5") || !strcmp(token, "iso_level3_shift")) {
++				mod |= WLR_MODIFIER_MOD5;
++				match_success = true;
++			}
+ 			if (!strcmp(token, "none")) {
+ 				match_success = true;
+ 			}

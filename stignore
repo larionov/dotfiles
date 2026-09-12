@@ -1,0 +1,10 @@
+// Git plumbing — versioned via the upstream repo, must not sync through Syncthing.
+// A leading-slash-free pattern matches at the root and in every subdirectory,
+// so this also covers nested package repos (e.g. emacs/.emacs.d/packages/*/.git).
+.git
+
+// Syncthing's own conflict copies should never round-trip to other devices.
+*.sync-conflict-*
+
+// OS cruft.
+.DS_Store

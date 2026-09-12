@@ -1,0 +1,16 @@
+#!/bin/bash
+# Toggle MangoWM VM passthrough mode.
+# In VM mode, all SUPER shortcuts are disabled so the super key passes through
+# to the VM/NomMachine session. Toggle back with SUPER+'.
+
+KEYMODE_FILE="/tmp/mango-keymode"
+
+CURRENT=$(mmsg -g -b 2>/dev/null | awk 'NR==1{print $3}')
+
+if [ "$CURRENT" = "vm" ]; then
+    mmsg -d setkeymode,default
+    echo "default" > "$KEYMODE_FILE"
+else
+    mmsg -d setkeymode,vm
+    echo "vm" > "$KEYMODE_FILE"
+fi
