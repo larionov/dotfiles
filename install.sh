@@ -121,6 +121,10 @@ check_dependencies() {
         missing_packages+=("kitty")
     fi
 
+    if ! command -v zellij >/dev/null 2>&1; then
+        missing_packages+=("zellij")
+    fi
+
     if ! command -v rg >/dev/null 2>&1; then
         missing_packages+=("ripgrep")
     fi
@@ -412,7 +416,7 @@ stow_packages() {
     cd "$DOTFILES_DIR"
     
     # Universal packages
-    packages+=("bash" "fish" "kitty" "scripts" "fontconfig" "micro")
+    packages+=("bash" "fish" "kitty" "zellij" "scripts" "fontconfig" "micro")
 
     # Platform-specific packages
     case "$os" in
@@ -425,11 +429,11 @@ stow_packages() {
             fi
             # Only install udev rules on the specific ThinkPad (machine ID: 2fe803d1fda247ce9c349f4c72fb2e4f)
             if [[ "$machine_id" == "2fe803d1fda247ce9c349f4c72fb2e4f" ]]; then
-                packages+=("udev")
+                packages+=("udev" "arr")
             fi
             ;;
         "macos")
-            # macOS-specific packages would go here
+            packages+=("yabai" "skhd" "sketchybar")
             ;;
     esac
 
@@ -442,15 +446,24 @@ stow_packages() {
 
     for package in "${packages[@]}"; do
         if [[ -d "$package" ]]; then
-            if [[ "$package" == "udev" ]]; then
+            if [[ "$package" == "udev" || "$package" == "arr" ]]; then
                 print_info "Installing $package with sudo (requires root access for /etc)..."
                 if sudo stow -v -t / "$package"; then
                     print_info "✓ $package stowed to root filesystem"
-                    # Reload udev rules
-                    print_info "Reloading udev rules..."
-                    sudo udevadm control --reload-rules
-                    sudo udevadm trigger --subsystem-match=input
-                    print_info "✓ udev rules reloaded"
+                    if [[ "$package" == "udev" ]]; then
+                        # Reload udev rules
+                        print_info "Reloading udev rules..."
+                        sudo udevadm control --reload-rules
+                        sudo udevadm trigger --subsystem-match=input
+                        print_info "✓ udev rules reloaded"
+                    else
+                        # Apply media group membership, directory modes and unit drop-ins
+                        print_info "Applying media stack users, directories and unit drop-ins..."
+                        sudo systemd-sysusers
+                        sudo systemd-tmpfiles --create /etc/tmpfiles.d/10-arr-media.conf
+                        sudo systemctl daemon-reload
+                        print_info "✓ media stack configuration applied"
+                    fi
                 else
                     print_warning "Failed to stow $package (conflicts?), skipping"
                     failed_packages+=("$package")
@@ -483,7 +496,7 @@ unstow_packages() {
     cd "$DOTFILES_DIR"
     
     # Universal packages
-    packages+=("bash" "fish" "kitty" "scripts" "fontconfig" "micro" "emacs")
+    packages+=("bash" "fish" "kitty" "zellij" "scripts" "fontconfig" "micro" "emacs")
 
     # Platform-specific packages
     case "$os" in
@@ -496,8 +509,11 @@ unstow_packages() {
             fi
             # Only include udev rules on the specific ThinkPad (machine ID: 2fe803d1fda247ce9c349f4c72fb2e4f)
             if [[ "$machine_id" == "2fe803d1fda247ce9c349f4c72fb2e4f" ]]; then
-                packages+=("udev")
+                packages+=("udev" "arr")
             fi
+            ;;
+        "macos")
+            packages+=("yabai" "skhd" "sketchybar")
             ;;
     esac
 
@@ -505,7 +521,7 @@ unstow_packages() {
     
     for package in "${packages[@]}"; do
         if [[ -d "$package" ]]; then
-            if [[ "$package" == "udev" ]]; then
+            if [[ "$package" == "udev" || "$package" == "arr" ]]; then
                 print_info "Removing $package with sudo..."
                 if sudo stow -D -v -t / "$package"; then
                     print_info "✓ $package unstowed from root filesystem"
@@ -542,6 +558,63 @@ update_git_packages() {
 }
 
 # Main installation function
+# macOS window-manager / bar runtime: yabai + skhd + sketchybar.
+# The stowed sketchybar config is Lua (SbarLua) with compiled native helpers,
+# so beyond stowing we must install brew deps + fonts, build SbarLua, compile
+# the helpers, and (re)start the services.
+setup_macos_bar() {
+    local os=$(detect_os)
+    [[ "$os" == "macos" ]] || return 0
+    command -v brew >/dev/null 2>&1 || { print_warning "Homebrew required for the macOS bar setup"; return 0; }
+
+    print_info "Setting up macOS bar (yabai / skhd / sketchybar)..."
+
+    # Brew formulae
+    brew list yabai >/dev/null 2>&1 || brew install koekeishiya/formulae/yabai || true
+    brew list skhd  >/dev/null 2>&1 || brew install koekeishiya/formulae/skhd  || true
+    command -v sketchybar >/dev/null 2>&1 || { brew tap FelixKratz/formulae >/dev/null 2>&1; brew install sketchybar || true; }
+    command -v lua >/dev/null 2>&1 || brew install lua || true
+
+    # Fonts (JetBrainsMono + Symbols Nerd Font + SF Pro + sketchybar-app-font)
+    brew install --cask font-jetbrains-mono-nerd-font font-symbols-only-nerd-font font-sf-pro 2>/dev/null || true
+    if [[ ! -f "$HOME/Library/Fonts/sketchybar-app-font.ttf" ]]; then
+        curl -fsSL -o "$HOME/Library/Fonts/sketchybar-app-font.ttf" \
+            https://github.com/kvndrsslr/sketchybar-app-font/releases/latest/download/sketchybar-app-font.ttf || true
+    fi
+
+    # SbarLua (Lua bindings) — interpreter + module in ~/.local/share/sketchybar_lua
+    if [[ ! -f "$HOME/.local/share/sketchybar_lua/sketchybar.so" || ! -x "$HOME/.local/share/sketchybar_lua/lua5.5" ]]; then
+        print_info "Building SbarLua..."
+        local tmp; tmp=$(mktemp -d)
+        if git clone --depth=1 https://github.com/FelixKratz/SbarLua.git "$tmp/SbarLua" >/dev/null 2>&1 \
+           && make -C "$tmp/SbarLua" install >/dev/null 2>&1; then
+            local luabin; luabin=$(find "$tmp/SbarLua" -path '*lua-5.5*/src/lua' -type f 2>/dev/null | head -1)
+            if [[ -n "$luabin" ]]; then cp "$luabin" "$HOME/.local/share/sketchybar_lua/lua5.5"; chmod +x "$HOME/.local/share/sketchybar_lua/lua5.5"; fi
+            print_info "✓ SbarLua installed"
+        else
+            print_warning "SbarLua build failed (needs lua + Xcode CLT); rerun after installing them"
+        fi
+        rm -rf "$tmp"
+    fi
+
+    # Fix the SketchyBar rc shebang to this user's SbarLua interpreter + make executable
+    local rc="$HOME/.config/sketchybar/sketchybarrc"
+    [[ -f "$rc" ]] && sed -i '' "1s|.*|#!$HOME/.local/share/sketchybar_lua/lua5.5|" "$rc" && chmod +x "$rc"
+
+    # Compile SketchyBar native helpers (gitignored; per-machine build)
+    if [[ -d "$HOME/.config/sketchybar/helpers" ]]; then
+        print_info "Building SketchyBar helpers..."
+        make -C "$HOME/.config/sketchybar/helpers" >/dev/null 2>&1 || print_warning "Some SketchyBar helpers failed to build"
+    fi
+
+    # yabai scripting addition + (re)start services
+    command -v yabai >/dev/null 2>&1 && sudo yabai --load-sa 2>/dev/null || true
+    for svc in yabai skhd sketchybar; do
+        command -v "$svc" >/dev/null 2>&1 && brew services restart "$svc" >/dev/null 2>&1 || true
+    done
+    print_info "✓ macOS bar ready. Disable macOS 'Switch to Desktop' shortcuts (System Settings > Keyboard) to free ⌘1-0."
+}
+
 main() {
     local os=$(detect_os)
     print_info "Installing dotfiles with GNU Stow on: $os"
@@ -591,7 +664,33 @@ main() {
     
     # Stow all packages
     stow_packages
-    
+
+    # macOS: build SketchyBar runtime (SbarLua + helpers), install deps, start services
+    setup_macos_bar
+
+    # Initialize MangoWM runtime state (not stowed - lives outside dotfiles dir)
+    if [[ -d "$DOTFILES_DIR/mangowc" ]]; then
+        mkdir -p "$HOME/.local/state/mango"
+        if [[ ! -f "$HOME/.local/state/mango/bindings.conf" ]]; then
+            cp "$HOME/.config/mango/bindings-super.conf" "$HOME/.local/state/mango/bindings.conf"
+            echo "super" > "$HOME/.local/state/mango/bindings-mode"
+            print_info "✓ MangoWM bindings initialized (SUPER mode)"
+        fi
+    fi
+
+    # Symlink DankMaterialShell plugins into existing config dir (not stow-managed)
+    if [[ -d "$DOTFILES_DIR/mangowc/.config/DankMaterialShell/plugins" ]]; then
+        mkdir -p "$HOME/.config/DankMaterialShell/plugins"
+        for plugin_dir in "$DOTFILES_DIR/mangowc/.config/DankMaterialShell/plugins"/*/; do
+            plugin_name=$(basename "$plugin_dir")
+            target="$HOME/.config/DankMaterialShell/plugins/$plugin_name"
+            if [[ ! -e "$target" ]]; then
+                ln -sf "$plugin_dir" "$target"
+                print_info "✓ DMS plugin symlinked: $plugin_name"
+            fi
+        done
+    fi
+
     print_info "Installation complete!"
     if [[ -d "$BACKUP_DIR" ]]; then
         print_info "Backups saved to: $BACKUP_DIR"
