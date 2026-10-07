@@ -1228,3 +1228,11 @@
   (dired-preview-global-mode 1)
   )
 
+
+;; Pilish drives omp via its native pi-RPC mode.  Official MELPA pilish
+;; is extended by the local pilish-omp overlay (event-type alias, omp
+;; launch config), so MELPA upgrades apply unchanged.
+(add-to-list 'load-path "~/.emacs.d/packages/pilish-omp/")
+(with-eval-after-load 'pilish
+  (require 'pilish-omp))
+(defalias 'pi 'pilish)
