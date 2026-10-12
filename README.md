@@ -54,6 +54,9 @@ cd ~/Sync/dotfiles-stow
 
 ```bash
 INSTALL_IOSEVKA=true ./install.sh    # Install optional Iosevka font
+INSTALL_KITTY=true ./install.sh      # Link kitty config (default: off, ghostty is used)
+INSTALL_ZELLIJ=true ./install.sh     # Link zellij config (default: off, herdr is used)
+INSTALL_FISH=true ./install.sh       # Link fish config (default: off, bash is used)
 ```
 
 ## How It Works
@@ -83,9 +86,10 @@ stow -D emacs    # Remove Emacs configuration links
 
 ### Platform-Specific Packages
 
-- **Universal**: bash, kitty, emacs, scripts
-- **Linux Only**: hyprland, waybar, dunst  
-- **macOS Only**: (none currently)
+- **Universal**: bash, ghostty, herdr, micro, fontconfig, scripts, emacs
+- **Optional** (opt-in via `INSTALL_*`): kitty, zellij, fish
+- **Linux (Arch) Only**: hyprland, waybar, dunst, hyprlock, mangowc
+- **macOS Only**: yabai, skhd, sketchybar
 
 ## Features
 

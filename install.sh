@@ -104,12 +104,16 @@ check_dependencies() {
     if ! command -v ark >/dev/null 2>&1; then
         missing_packages+=("ark")
     fi
+
+    if ! command -v direnv >/dev/null 2>&1; then
+        missing_packages+=("direnv")
+    fi
     
     if ! command -v wget >/dev/null 2>&1 && ! command -v curl >/dev/null 2>&1; then
         missing_packages+=("wget")
     fi
     
-    if ! command -v fish >/dev/null 2>&1; then
+    if [[ "${INSTALL_FISH:-false}" == "true" ]] && ! command -v fish >/dev/null 2>&1; then
         missing_packages+=("fish")
     fi
 
@@ -117,11 +121,11 @@ check_dependencies() {
         missing_packages+=("micro")
     fi
 
-    if ! command -v kitty >/dev/null 2>&1; then
+    if [[ "${INSTALL_KITTY:-false}" == "true" ]] && ! command -v kitty >/dev/null 2>&1; then
         missing_packages+=("kitty")
     fi
 
-    if ! command -v zellij >/dev/null 2>&1; then
+    if [[ "${INSTALL_ZELLIJ:-false}" == "true" ]] && ! command -v zellij >/dev/null 2>&1; then
         missing_packages+=("zellij")
     fi
 
@@ -235,18 +239,23 @@ install_fonts() {
         
         local temp_dir=$(mktemp -d)
         local fira_url="https://github.com/ryanoasis/nerd-fonts/releases/download/v3.1.1/FiraMono.zip"
-        
+
         if command -v wget >/dev/null 2>&1; then
             wget -O "$temp_dir/fira-nerd.zip" "$fira_url"
         else
             curl -L -o "$temp_dir/fira-nerd.zip" "$fira_url"
         fi
-        
+
         unzip -q "$temp_dir/fira-nerd.zip" -d "$temp_dir"
-        cp "$temp_dir"/*.ttf "$fonts_dir/" 2>/dev/null || true
+        cp "$temp_dir"/*.ttf "$temp_dir"/*.otf "$fonts_dir/" 2>/dev/null || true
         
         if [[ "$os" != "macos" ]]; then
             fc-cache -fv
+        fi
+        if ! ls "$fonts_dir"/FiraMonoNerdFont*.ttf "$fonts_dir"/FiraMonoNerdFont*.otf >/dev/null 2>&1; then
+            print_error "FiraMono Nerd Font not installed into $fonts_dir"
+            rm -rf "$temp_dir"
+            return 1
         fi
         print_info "✓ FiraMono Nerd Font installed"
         
@@ -280,7 +289,10 @@ install_fonts() {
     fi
     
     # Install Maple Mono NF CN
-    if ! fc-list | grep -i "maple mono nf cn" > /dev/null 2>&1; then
+    # Gate on files, not fc-list: fonts.conf rejectsfont the family, so
+    # fc-list never reports it and a cache check re-downloads every run.
+    if ! compgen -G "$fonts_dir/MapleMono-NF-CN-*.ttf" >/dev/null \
+        && [[ -z "$(find /usr/share/fonts /usr/local/share/fonts -name 'MapleMono-NF-CN-*.ttf' -print -quit 2>/dev/null)" ]]; then
         local installed_maple=false
 
         # Try AUR on Arch Linux
@@ -415,8 +427,17 @@ stow_packages() {
     
     cd "$DOTFILES_DIR"
     
-    # Universal packages
-    packages+=("bash" "fish" "kitty" "zellij" "scripts" "fontconfig" "micro")
+    # Universal packages. Terminal/multiplexer/shell choices: ghostty and
+    # herdr link by default; kitty, zellij and fish only when their
+    # INSTALL_* variable is set to true.
+    local install_kitty="${INSTALL_KITTY:-false}"
+    local install_zellij="${INSTALL_ZELLIJ:-false}"
+    local install_fish="${INSTALL_FISH:-false}"
+
+    packages+=("bash" "scripts" "fontconfig" "micro" "ghostty" "herdr")
+    [[ "$install_kitty" == "true" ]] && packages+=("kitty")
+    [[ "$install_zellij" == "true" ]] && packages+=("zellij")
+    [[ "$install_fish" == "true" ]] && packages+=("fish")
 
     # Platform-specific packages
     case "$os" in
@@ -496,7 +517,7 @@ unstow_packages() {
     cd "$DOTFILES_DIR"
     
     # Universal packages
-    packages+=("bash" "fish" "kitty" "zellij" "scripts" "fontconfig" "micro" "emacs")
+    packages+=("bash" "fish" "kitty" "zellij" "scripts" "fontconfig" "micro" "ghostty" "herdr" "emacs")
 
     # Platform-specific packages
     case "$os" in
@@ -669,7 +690,7 @@ main() {
     setup_macos_bar
 
     # Initialize MangoWM runtime state (not stowed - lives outside dotfiles dir)
-    if [[ -d "$DOTFILES_DIR/mangowc" ]]; then
+    if [[ -d "$HOME/.config/mango" ]]; then
         mkdir -p "$HOME/.local/state/mango"
         if [[ ! -f "$HOME/.local/state/mango/bindings.conf" ]]; then
             cp "$HOME/.config/mango/bindings-super.conf" "$HOME/.local/state/mango/bindings.conf"
@@ -679,7 +700,7 @@ main() {
     fi
 
     # Symlink DankMaterialShell plugins into existing config dir (not stow-managed)
-    if [[ -d "$DOTFILES_DIR/mangowc/.config/DankMaterialShell/plugins" ]]; then
+    if [[ -d "$HOME/.config/mango" && -d "$DOTFILES_DIR/mangowc/.config/DankMaterialShell/plugins" ]]; then
         mkdir -p "$HOME/.config/DankMaterialShell/plugins"
         for plugin_dir in "$DOTFILES_DIR/mangowc/.config/DankMaterialShell/plugins"/*/; do
             plugin_name=$(basename "$plugin_dir")
@@ -732,12 +753,15 @@ show_usage() {
     echo ""
     echo "Environment variables:"
     echo "  INSTALL_IOSEVKA=true    Install Iosevka font (optional)"
+    echo "  INSTALL_KITTY=true      Link the kitty config"
+    echo "  INSTALL_ZELLIJ=true     Link the zellij config"
+    echo "  INSTALL_FISH=true       Link the fish config"
     echo ""
     echo "Examples:"
     echo "  $0                      # Install dotfiles"
     echo "  $0 uninstall            # Remove all symlinks"
     echo "  $0 update               # Update git packages"
-    echo "  INSTALL_IOSEVKA=true $0 # Install with Iosevka font"
+    echo "  INSTALL_KITTY=true $0   # Install including kitty"
 }
 
 # Handle help and run main
